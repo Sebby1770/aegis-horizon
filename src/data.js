@@ -163,6 +163,47 @@ export const scenarios = {
     ],
     future: [35, 43, 54, 60, 67, 74, 80]
   },
+  agents: {
+    code: "AG-44",
+    label: "Agents",
+    mapLabel: "Agentic Workflows",
+    title: "Autonomous agent trust boundary",
+    headline: "Put policy between intent and action",
+    summary: "AI agents are multiplying access paths, so delegated permissions need strict scope, approvals, and durable audit trails.",
+    baseRisk: 59,
+    signal: 86,
+    assets: 1186,
+    mttr: 29,
+    nodes: [
+      { id: "Prompt Hub", x: 0.16, y: 0.32, weight: 0.6 },
+      { id: "Agent Runtime", x: 0.39, y: 0.22, weight: 0.82 },
+      { id: "Tool Gateway", x: 0.64, y: 0.34, weight: 0.76 },
+      { id: "SaaS APIs", x: 0.8, y: 0.6, weight: 0.58 },
+      { id: "Policy Engine", x: 0.49, y: 0.74, weight: 0.47 },
+      { id: "Audit Lake", x: 0.23, y: 0.68, weight: 0.38 }
+    ],
+    links: [
+      ["Prompt Hub", "Agent Runtime"],
+      ["Agent Runtime", "Tool Gateway"],
+      ["Tool Gateway", "SaaS APIs"],
+      ["SaaS APIs", "Policy Engine"],
+      ["Policy Engine", "Audit Lake"],
+      ["Audit Lake", "Agent Runtime"]
+    ],
+    incidents: [
+      ["High", "Agent requested broader tool scope than policy allows"],
+      ["Medium", "Delegated SaaS token lacks expiry guard"],
+      ["Medium", "Prompt library changed without approval evidence"],
+      ["Low", "Audit stream missed a tool invocation tag"]
+    ],
+    playbook: [
+      "Bind each agent action to a named policy decision",
+      "Require scoped, expiring tokens for tool calls",
+      "Route high-impact requests through human approval",
+      "Hash prompt and tool manifests into the audit trail"
+    ],
+    future: [36, 45, 56, 66, 73, 82, 91]
+  },
   quantum: {
     code: "QK-05",
     label: "Quantum",

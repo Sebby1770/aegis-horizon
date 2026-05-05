@@ -3,6 +3,7 @@ import { controlWeights, modeProfiles, scenarios } from "./data.js";
 const state = {
   scenario: "identity",
   mode: "monitor",
+  horizon: 90,
   ranges: {
     identity: 42,
     cloud: 35,
@@ -17,37 +18,56 @@ const state = {
   pulse: 0
 };
 
+const profileStorageKey = "aegis-horizon-profile";
+
+const horizonProfiles = {
+  30: { label: "30d", riskPressure: -2, futureBoost: 0.92, caption: "Near-term control maturity projection" },
+  90: { label: "90d", riskPressure: 2, futureBoost: 1, caption: "Quarterly control maturity projection" },
+  180: { label: "180d", riskPressure: 7, futureBoost: 1.12, caption: "Long-range resilience projection" }
+};
+
 const els = {
   scenarioButtons: document.querySelector("#scenarioButtons"),
   scenarioCode: document.querySelector("#scenarioCode"),
   scenarioTitle: document.querySelector("#scenarioTitle"),
+  missionSubtitle: document.querySelector("#missionSubtitle"),
   modeLabel: document.querySelector("#modeLabel"),
+  horizonLabel: document.querySelector("#horizonLabel"),
   exposureValue: document.querySelector("#exposureValue"),
   coverageScore: document.querySelector("#coverageScore"),
   signalScore: document.querySelector("#signalScore"),
   assetCount: document.querySelector("#assetCount"),
   mttrScore: document.querySelector("#mttrScore"),
+  autonomyScore: document.querySelector("#autonomyScore"),
   riskRing: document.querySelector("#riskRing"),
   riskScore: document.querySelector("#riskScore"),
   riskHeadline: document.querySelector("#riskHeadline"),
   riskSummary: document.querySelector("#riskSummary"),
+  futureNote: document.querySelector("#futureNote"),
   blastRadius: document.querySelector("#blastRadius"),
   trustCoverage: document.querySelector("#trustCoverage"),
   containmentScore: document.querySelector("#containmentScore"),
   mapLabel: document.querySelector("#mapLabel"),
   mapState: document.querySelector("#mapState"),
+  mapTelemetry: document.querySelector("#mapTelemetry"),
   incidentList: document.querySelector("#incidentList"),
   queueCount: document.querySelector("#queueCount"),
   playbookList: document.querySelector("#playbookList"),
   playbookClock: document.querySelector("#playbookClock"),
   futureScore: document.querySelector("#futureScore"),
+  forecastCaption: document.querySelector("#forecastCaption"),
+  autopilotList: document.querySelector("#autopilotList"),
+  autopilotState: document.querySelector("#autopilotState"),
+  profileState: document.querySelector("#profileState"),
   identityRange: document.querySelector("#identityRange"),
   cloudRange: document.querySelector("#cloudRange"),
   dataRange: document.querySelector("#dataRange"),
   threatCanvas: document.querySelector("#threatCanvas"),
   forecastCanvas: document.querySelector("#forecastCanvas"),
   forecastButton: document.querySelector("#forecastButton"),
-  exportButton: document.querySelector("#exportButton")
+  exportButton: document.querySelector("#exportButton"),
+  saveProfileButton: document.querySelector("#saveProfileButton"),
+  loadProfileButton: document.querySelector("#loadProfileButton")
 };
 
 const threatCtx = els.threatCanvas.getContext("2d");
@@ -71,6 +91,10 @@ function activeScenario() {
   return scenarios[state.scenario];
 }
 
+function horizonProfile() {
+  return horizonProfiles[state.horizon] ?? horizonProfiles[90];
+}
+
 function coverage() {
   const enabled = Object.entries(state.controls).reduce((total, [key, isOn]) => {
     return total + (isOn ? controlWeights[key] : 0);
@@ -85,13 +109,19 @@ function exposure() {
 
 function riskScore() {
   const scenario = activeScenario();
+  const horizon = horizonProfile();
   const exposurePressure =
     state.ranges.identity * 0.17 +
     state.ranges.cloud * 0.14 +
     state.ranges.data * 0.12;
   const coverageRelief = coverage() * 0.24;
   const modeShift = modeProfiles[state.mode].riskShift;
-  return clamp(Math.round(scenario.baseRisk + exposurePressure - coverageRelief + modeShift), 8, 97);
+  const longRangePressure = exposure() > 62 ? Math.round((state.horizon / 180) * 5) : 0;
+  return clamp(
+    Math.round(scenario.baseRisk + exposurePressure - coverageRelief + modeShift + horizon.riskPressure + longRangePressure),
+    8,
+    97
+  );
 }
 
 function riskBand(score) {
@@ -112,12 +142,20 @@ function containmentMinutes() {
   const score = riskScore();
   const modeFactor = modeProfiles[state.mode].containment;
   const controlFactor = 1 - coverage() / 300;
-  return clamp(Math.round((scenario.mttr + score * 0.25) * modeFactor * controlFactor), 8, 90);
+  const horizonFactor = state.horizon === 180 ? 1.08 : state.horizon === 30 ? 0.94 : 1;
+  return clamp(Math.round((scenario.mttr + score * 0.25) * modeFactor * controlFactor * horizonFactor), 8, 90);
+}
+
+function autonomyScore() {
+  const modeBonus = { monitor: 0, harden: 5, contain: 9 }[state.mode];
+  const secretBonus = state.controls.secrets ? 8 : -4;
+  return clamp(Math.round(46 + coverage() * 0.42 - riskScore() * 0.16 - exposure() * 0.08 + modeBonus + secretBonus), 18, 98);
 }
 
 function futureLift() {
   const future = activeScenario().future;
-  return Math.max(8, future[future.length - 1] - future[0] - Math.round(riskScore() / 12));
+  const horizonBoost = state.horizon === 180 ? 7 : state.horizon === 30 ? -3 : 0;
+  return Math.max(8, future[future.length - 1] - future[0] - Math.round(riskScore() / 12) + horizonBoost);
 }
 
 function formatNumber(value) {
@@ -126,9 +164,21 @@ function formatNumber(value) {
 
 function setPressed(buttons, activeValue, dataName) {
   buttons.forEach((button) => {
-    const active = button.dataset[dataName] === activeValue;
+    const active = button.dataset[dataName] === String(activeValue);
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-pressed", String(active));
+  });
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (char) => {
+    return {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    }[char];
   });
 }
 
@@ -170,8 +220,57 @@ function renderIncidents(score) {
 function renderPlaybook(minutes) {
   els.playbookClock.textContent = `${minutes + 26}m`;
   els.playbookList.innerHTML = activeScenario().playbook
-    .map((item, index) => `<li><span>${index + 1}</span><p>${item}</p></li>`)
+    .map((item, index) => `<li><span>${index + 1}</span><p>${escapeHtml(item)}</p></li>`)
     .join("");
+}
+
+function recommendedActions(score) {
+  const actions = [];
+
+  if (!state.controls.mfa) actions.push("Reinstate phishing-resistant MFA for all privileged paths");
+  if (!state.controls.edr) actions.push("Restore endpoint telemetry before expanding autonomous response");
+  if (!state.controls.backups) actions.push("Verify restore integrity against the most critical services");
+  if (!state.controls.secrets) actions.push("Rotate high-value secrets and shorten delegated token life");
+  if (state.ranges.identity > 64) actions.push("Compress dormant identity access and require step-up checks");
+  if (state.ranges.cloud > 64) actions.push("Reconcile cloud drift against approved infrastructure state");
+  if (state.ranges.data > 64) actions.push("Reduce sensitive data concentration before long-range exposure grows");
+  if (score >= 72) actions.push("Move response mode to containment until the queue cools below critical");
+
+  activeScenario().playbook.forEach((item) => actions.push(item));
+
+  return [...new Set(actions)].slice(0, 4);
+}
+
+function renderAutopilot(score) {
+  els.autopilotState.textContent = score >= 72 ? "Act now" : score >= 52 ? "Tune" : "Ready";
+  els.autopilotList.innerHTML = recommendedActions(score)
+    .map((action, index) => {
+      return `
+        <article class="autopilot-row">
+          <span>${String(index + 1).padStart(2, "0")}</span>
+          <p>${escapeHtml(action)}</p>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function forecastData() {
+  const horizon = horizonProfile();
+  const controlBoost = coverage() * 0.08;
+  const riskDrag = riskScore() * 0.05;
+  const exposureDrag = Math.max(0, exposure() - 50) * 0.04;
+  return activeScenario().future.map((value, index) => {
+    const horizonSlope = state.horizon === 180 ? index * 1.2 : state.horizon === 30 ? index * -0.35 : index * 0.35;
+    return clamp(value * horizon.futureBoost + controlBoost - riskDrag - exposureDrag + horizonSlope, 10, 98);
+  });
+}
+
+function futureNote(score) {
+  const band = riskBand(score).toLowerCase();
+  if (state.horizon === 180) return `180-day ${band} posture with long-range drift pressure.`;
+  if (state.horizon === 30) return `30-day ${band} posture focused on immediate containment.`;
+  return `90-day ${band} posture with quarterly resilience lift.`;
 }
 
 function renderDashboard() {
@@ -179,30 +278,38 @@ function renderDashboard() {
   const score = riskScore();
   const cover = coverage();
   const minutes = containmentMinutes();
+  const horizon = horizonProfile();
 
   els.scenarioCode.textContent = scenario.code;
   els.scenarioTitle.textContent = scenario.title;
+  els.missionSubtitle.textContent = `${horizon.label} local-only posture forecast`;
   els.mapLabel.textContent = scenario.mapLabel;
   els.mapState.textContent = state.mode === "contain" ? "Containment live" : state.mode === "harden" ? "Hardening wave" : "Active watch";
+  els.mapTelemetry.textContent = `${scenario.nodes.length} nodes, ${scenario.links.length} trust paths`;
   els.modeLabel.textContent = modeProfiles[state.mode].label;
+  els.horizonLabel.textContent = horizon.label;
   els.exposureValue.textContent = String(exposure());
   els.coverageScore.textContent = `${cover}%`;
   els.signalScore.textContent = `${clamp(scenario.signal + Math.round((cover - 70) / 4), 44, 99)}%`;
   els.assetCount.textContent = formatNumber(scenario.assets + Math.round(exposure() * 9));
   els.mttrScore.textContent = `${minutes}m`;
+  els.autonomyScore.textContent = `${autonomyScore()}%`;
 
   els.riskRing.style.setProperty("--risk", score);
   els.riskRing.style.setProperty("--risk-color", riskColor(score));
   els.riskScore.textContent = String(score);
   els.riskHeadline.textContent = scenario.headline;
   els.riskSummary.textContent = scenario.summary;
+  els.futureNote.textContent = futureNote(score);
   els.blastRadius.textContent = riskBand(score);
   els.trustCoverage.textContent = `${cover}%`;
   els.containmentScore.textContent = `${minutes}m`;
   els.futureScore.textContent = `+${futureLift()}%`;
+  els.forecastCaption.textContent = horizon.caption;
 
   renderIncidents(score);
   renderPlaybook(minutes);
+  renderAutopilot(score);
   drawForecast();
 }
 
@@ -326,7 +433,7 @@ function drawForecast() {
   const rect = resizeCanvas(els.forecastCanvas, forecastCtx);
   const width = rect.width;
   const height = rect.height;
-  const data = activeScenario().future.map((value) => clamp(value + coverage() * 0.08 - riskScore() * 0.05, 10, 98));
+  const data = forecastData();
   const padding = 28;
   const innerWidth = width - padding * 2;
   const innerHeight = height - padding * 2;
@@ -371,29 +478,45 @@ function drawForecast() {
 
 function runForecastPulse() {
   els.forecastButton.classList.add("is-busy");
-  const current = state.ranges.identity;
-  state.ranges.identity = clamp(current + (Math.random() > 0.5 ? 4 : -4), 0, 100);
+  const direction = Math.random() > 0.5 ? 4 : -4;
+  state.ranges.identity = clamp(state.ranges.identity + direction, 0, 100);
+  state.ranges.cloud = clamp(state.ranges.cloud + Math.round(direction / 2), 0, 100);
   els.identityRange.value = String(state.ranges.identity);
+  els.cloudRange.value = String(state.ranges.cloud);
+  markProfileChanged();
   renderDashboard();
   window.setTimeout(() => els.forecastButton.classList.remove("is-busy"), 420);
 }
 
-function exportBrief() {
+async function digestText(text) {
+  if (!window.crypto?.subtle) return "unavailable";
+  const buffer = await window.crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(buffer)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function exportBrief() {
   const scenario = activeScenario();
   const brief = {
     project: "Aegis Horizon",
     scenario: scenario.title,
     code: scenario.code,
     mode: modeProfiles[state.mode].label,
+    horizonDays: state.horizon,
     risk: riskScore(),
     coverage: coverage(),
+    autonomy: autonomyScore(),
     exposure: exposure(),
     containmentMinutes: containmentMinutes(),
     incidents: scenario.incidents,
     playbook: scenario.playbook,
+    autopilot: recommendedActions(riskScore()),
+    controls: state.controls,
+    ranges: state.ranges,
     generatedAt: new Date().toISOString()
   };
-  const blob = new Blob([JSON.stringify(brief, null, 2)], { type: "application/json" });
+  const digest = await digestText(JSON.stringify(brief));
+  const payload = { ...brief, integrity: { algorithm: "SHA-256", digest } };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -402,6 +525,93 @@ function exportBrief() {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+function markProfileState(label) {
+  els.profileState.textContent = label;
+}
+
+function markProfileChanged() {
+  markProfileState("Changed");
+}
+
+function profilePayload() {
+  return {
+    scenario: state.scenario,
+    mode: state.mode,
+    horizon: state.horizon,
+    ranges: { ...state.ranges },
+    controls: { ...state.controls },
+    savedAt: new Date().toISOString()
+  };
+}
+
+function updateControlsFromState() {
+  els.identityRange.value = String(state.ranges.identity);
+  els.cloudRange.value = String(state.ranges.cloud);
+  els.dataRange.value = String(state.ranges.data);
+
+  document.querySelectorAll("[data-control]").forEach((input) => {
+    input.checked = Boolean(state.controls[input.dataset.control]);
+  });
+
+  setPressed([...els.scenarioButtons.querySelectorAll("button")], state.scenario, "scenario");
+  setPressed([...document.querySelectorAll("[data-mode]")], state.mode, "mode");
+  setPressed([...document.querySelectorAll("[data-horizon]")], state.horizon, "horizon");
+}
+
+function saveProfile() {
+  try {
+    window.localStorage.setItem(profileStorageKey, JSON.stringify(profilePayload()));
+    markProfileState("Saved");
+  } catch {
+    markProfileState("Blocked");
+  }
+}
+
+function loadProfile() {
+  try {
+    const stored = window.localStorage.getItem(profileStorageKey);
+    if (!stored) {
+      markProfileState("Empty");
+      return;
+    }
+
+    const profile = JSON.parse(stored);
+    if (!scenarios[profile.scenario] || !modeProfiles[profile.mode] || !horizonProfiles[profile.horizon]) {
+      markProfileState("Invalid");
+      return;
+    }
+
+    state.scenario = profile.scenario;
+    state.mode = profile.mode;
+    state.horizon = Number(profile.horizon);
+    state.ranges = {
+      identity: clamp(Number(profile.ranges?.identity ?? state.ranges.identity), 0, 100),
+      cloud: clamp(Number(profile.ranges?.cloud ?? state.ranges.cloud), 0, 100),
+      data: clamp(Number(profile.ranges?.data ?? state.ranges.data), 0, 100)
+    };
+    state.controls = {
+      mfa: Boolean(profile.controls?.mfa),
+      edr: Boolean(profile.controls?.edr),
+      backups: Boolean(profile.controls?.backups),
+      secrets: Boolean(profile.controls?.secrets)
+    };
+
+    updateControlsFromState();
+    renderDashboard();
+    markProfileState("Loaded");
+  } catch {
+    markProfileState("Invalid");
+  }
+}
+
+function setInitialProfileState() {
+  try {
+    markProfileState(window.localStorage.getItem(profileStorageKey) ? "Saved" : "Unsaved");
+  } catch {
+    markProfileState("Local");
+  }
 }
 
 function bindEvents() {
@@ -417,6 +627,16 @@ function bindEvents() {
     button.addEventListener("click", () => {
       state.mode = button.dataset.mode;
       setPressed([...document.querySelectorAll("[data-mode]")], state.mode, "mode");
+      markProfileChanged();
+      renderDashboard();
+    });
+  });
+
+  document.querySelectorAll("[data-horizon]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.horizon = Number(button.dataset.horizon);
+      setPressed([...document.querySelectorAll("[data-horizon]")], state.horizon, "horizon");
+      markProfileChanged();
       renderDashboard();
     });
   });
@@ -428,6 +648,7 @@ function bindEvents() {
   ].forEach(([input, key]) => {
     input.addEventListener("input", () => {
       state.ranges[key] = Number(input.value);
+      markProfileChanged();
       renderDashboard();
     });
   });
@@ -435,16 +656,20 @@ function bindEvents() {
   document.querySelectorAll("[data-control]").forEach((input) => {
     input.addEventListener("change", () => {
       state.controls[input.dataset.control] = input.checked;
+      markProfileChanged();
       renderDashboard();
     });
   });
 
   els.forecastButton.addEventListener("click", runForecastPulse);
-  els.exportButton.addEventListener("click", exportBrief);
+  els.exportButton.addEventListener("click", () => void exportBrief());
+  els.saveProfileButton.addEventListener("click", saveProfile);
+  els.loadProfileButton.addEventListener("click", loadProfile);
   window.addEventListener("resize", drawForecast);
 }
 
 renderScenarioButtons();
 bindEvents();
+setInitialProfileState();
 renderDashboard();
 drawThreatMap();

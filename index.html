@@ -37,6 +37,10 @@
             <span>MTTR</span>
             <strong id="mttrScore">18m</strong>
           </div>
+          <div>
+            <span>Autonomy</span>
+            <strong id="autonomyScore">72%</strong>
+          </div>
         </div>
       </header>
 
@@ -59,6 +63,18 @@
               <button class="is-active" type="button" data-mode="monitor" aria-pressed="true">Monitor</button>
               <button type="button" data-mode="harden" aria-pressed="false">Harden</button>
               <button type="button" data-mode="contain" aria-pressed="false">Contain</button>
+            </div>
+          </section>
+
+          <section class="rail-section">
+            <div class="section-heading">
+              <span>Future Horizon</span>
+              <strong id="horizonLabel">90d</strong>
+            </div>
+            <div class="segmented" role="group" aria-label="Future horizon">
+              <button type="button" data-horizon="30" aria-pressed="false">30d</button>
+              <button class="is-active" type="button" data-horizon="90" aria-pressed="true">90d</button>
+              <button type="button" data-horizon="180" aria-pressed="false">180d</button>
             </div>
           </section>
 
@@ -103,6 +119,23 @@
               <span>Secrets rotated</span>
             </label>
           </section>
+
+          <section class="rail-section">
+            <div class="section-heading">
+              <span>Profile</span>
+              <strong id="profileState">Unsaved</strong>
+            </div>
+            <div class="profile-actions">
+              <button class="profile-button" id="saveProfileButton" type="button" title="Save posture profile">
+                <span aria-hidden="true">S</span>
+                <strong>Save</strong>
+              </button>
+              <button class="profile-button" id="loadProfileButton" type="button" title="Restore posture profile">
+                <span aria-hidden="true">L</span>
+                <strong>Load</strong>
+              </button>
+            </div>
+          </section>
         </aside>
 
         <section class="mission-board" aria-label="Cyber command center">
@@ -110,12 +143,13 @@
             <div>
               <p class="eyebrow">Resilience forecast</p>
               <h1 id="scenarioTitle">Identity mesh breach rehearsal</h1>
+              <p class="mission-subtitle" id="missionSubtitle">Local-only future posture model</p>
             </div>
             <div class="toolbar-actions">
-              <button class="icon-button" id="forecastButton" type="button" aria-label="Run forecast">
+              <button class="icon-button" id="forecastButton" type="button" aria-label="Run forecast" title="Run forecast">
                 <span aria-hidden="true">R</span>
               </button>
-              <button class="icon-button" id="exportButton" type="button" aria-label="Export brief">
+              <button class="icon-button" id="exportButton" type="button" aria-label="Export brief" title="Export brief">
                 <span aria-hidden="true">E</span>
               </button>
             </div>
@@ -127,6 +161,7 @@
               <div class="map-overlay">
                 <span id="mapLabel">Identity Abuse</span>
                 <strong id="mapState">Active watch</strong>
+                <small id="mapTelemetry">6 nodes linked</small>
               </div>
             </section>
 
@@ -138,6 +173,7 @@
               <div class="risk-copy">
                 <h2 id="riskHeadline">Guard the privilege chain</h2>
                 <p id="riskSummary">Identity telemetry is stable, but privileged session depth needs a tighter verification loop.</p>
+                <small id="futureNote">90-day drift pressure is contained.</small>
               </div>
               <div class="metric-stack">
                 <div>
@@ -179,6 +215,15 @@
                 <strong id="futureScore">+18%</strong>
               </div>
               <canvas id="forecastCanvas" width="760" height="320"></canvas>
+              <p class="forecast-caption" id="forecastCaption">Seven-point control maturity projection</p>
+            </section>
+
+            <section class="autopilot-panel" aria-label="Autopilot recommendations">
+              <div class="panel-heading">
+                <span>Autopilot</span>
+                <strong id="autopilotState">Ready</strong>
+              </div>
+              <div class="autopilot-list" id="autopilotList"></div>
             </section>
           </div>
         </section>
