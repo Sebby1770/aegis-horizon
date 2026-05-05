@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Aegis Horizon mark</title>
+  <desc id="desc">A shield formed from future-facing signal bands.</desc>
+  <defs>
+    <linearGradient id="signal" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#7CFFB2"/>
+      <stop offset="0.48" stop-color="#2ED3FF"/>
+      <stop offset="1" stop-color="#FFB84C"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="24" fill="#101312"/>
+  <path d="M64 15 103 29v29c0 25-15 46-39 56-24-10-39-31-39-56V29l39-14Z" fill="#161B18" stroke="url(#signal)" stroke-width="6"/>
+  <path d="M38 51h34c7 0 13 6 13 13s-6 13-13 13H55" fill="none" stroke="#7CFFB2" stroke-width="8" stroke-linecap="round"/>
+  <path d="M90 50h-8M73 79h19M41 79h7" fill="none" stroke="#FFB84C" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="72" cy="64" r="7" fill="#2ED3FF"/>
+</svg>

@@ -1,0 +1,20 @@
+{
+  "name": "aegis-horizon",
+  "version": "1.0.0",
+  "description": "A futuristic defensive cybersecurity command center for blue-team planning and resilience forecasting.",
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 4173",
+    "test": "node tools/validate.mjs"
+  },
+  "keywords": [
+    "cybersecurity",
+    "blue-team",
+    "risk",
+    "zero-trust",
+    "dashboard",
+    "incident-response"
+  ],
+  "author": "Sebby1770",
+  "license": "MIT"
+}

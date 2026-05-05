@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101312">
+    <meta
+      name="description"
+      content="A futuristic defensive cybersecurity command center for blue-team planning and resilience forecasting."
+    >
+    <title>Aegis Horizon</title>
+    <link rel="icon" href="assets/aegis-mark.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="src/styles.css">
+    <script type="module" src="src/app.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="Aegis Horizon home">
+          <img src="assets/aegis-mark.svg" alt="" width="44" height="44">
+          <span>
+            <strong>Aegis Horizon</strong>
+            <small>Future Cyber Defense</small>
+          </span>
+        </a>
+
+        <div class="status-strip" aria-label="Live posture summary">
+          <div>
+            <span>Signal</span>
+            <strong id="signalScore">84%</strong>
+          </div>
+          <div>
+            <span>Assets</span>
+            <strong id="assetCount">1,248</strong>
+          </div>
+          <div>
+            <span>MTTR</span>
+            <strong id="mttrScore">18m</strong>
+          </div>
+        </div>
+      </header>
+
+      <main class="dashboard">
+        <aside class="control-rail" aria-label="Cyber posture controls">
+          <section class="rail-section">
+            <div class="section-heading">
+              <span>Scenario</span>
+              <strong id="scenarioCode">ID-07</strong>
+            </div>
+            <div class="scenario-grid" id="scenarioButtons" role="list"></div>
+          </section>
+
+          <section class="rail-section">
+            <div class="section-heading">
+              <span>Response Mode</span>
+              <strong id="modeLabel">Monitor</strong>
+            </div>
+            <div class="segmented" role="group" aria-label="Response mode">
+              <button class="is-active" type="button" data-mode="monitor" aria-pressed="true">Monitor</button>
+              <button type="button" data-mode="harden" aria-pressed="false">Harden</button>
+              <button type="button" data-mode="contain" aria-pressed="false">Contain</button>
+            </div>
+          </section>
+
+          <section class="rail-section">
+            <div class="section-heading">
+              <span>Exposure</span>
+              <strong id="exposureValue">42</strong>
+            </div>
+            <label class="range-row">
+              <span>Identity surface</span>
+              <input id="identityRange" type="range" min="0" max="100" value="42">
+            </label>
+            <label class="range-row">
+              <span>Cloud drift</span>
+              <input id="cloudRange" type="range" min="0" max="100" value="35">
+            </label>
+            <label class="range-row">
+              <span>Data gravity</span>
+              <input id="dataRange" type="range" min="0" max="100" value="58">
+            </label>
+          </section>
+
+          <section class="rail-section">
+            <div class="section-heading">
+              <span>Controls</span>
+              <strong id="coverageScore">76%</strong>
+            </div>
+            <label class="toggle-row">
+              <input type="checkbox" data-control="mfa" checked>
+              <span>MFA enforced</span>
+            </label>
+            <label class="toggle-row">
+              <input type="checkbox" data-control="edr" checked>
+              <span>EDR healthy</span>
+            </label>
+            <label class="toggle-row">
+              <input type="checkbox" data-control="backups" checked>
+              <span>Backups verified</span>
+            </label>
+            <label class="toggle-row">
+              <input type="checkbox" data-control="secrets">
+              <span>Secrets rotated</span>
+            </label>
+          </section>
+        </aside>
+
+        <section class="mission-board" aria-label="Cyber command center">
+          <div class="mission-toolbar">
+            <div>
+              <p class="eyebrow">Resilience forecast</p>
+              <h1 id="scenarioTitle">Identity mesh breach rehearsal</h1>
+            </div>
+            <div class="toolbar-actions">
+              <button class="icon-button" id="forecastButton" type="button" aria-label="Run forecast">
+                <span aria-hidden="true">R</span>
+              </button>
+              <button class="icon-button" id="exportButton" type="button" aria-label="Export brief">
+                <span aria-hidden="true">E</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="mission-grid">
+            <section class="map-panel" aria-label="Attack surface map">
+              <canvas id="threatCanvas" width="1200" height="760"></canvas>
+              <div class="map-overlay">
+                <span id="mapLabel">Identity Abuse</span>
+                <strong id="mapState">Active watch</strong>
+              </div>
+            </section>
+
+            <section class="risk-panel" aria-label="Risk score">
+              <div class="risk-ring" id="riskRing" style="--risk: 54">
+                <span>Risk</span>
+                <strong id="riskScore">54</strong>
+              </div>
+              <div class="risk-copy">
+                <h2 id="riskHeadline">Guard the privilege chain</h2>
+                <p id="riskSummary">Identity telemetry is stable, but privileged session depth needs a tighter verification loop.</p>
+              </div>
+              <div class="metric-stack">
+                <div>
+                  <span>Blast radius</span>
+                  <strong id="blastRadius">Medium</strong>
+                </div>
+                <div>
+                  <span>Trust coverage</span>
+                  <strong id="trustCoverage">76%</strong>
+                </div>
+                <div>
+                  <span>Containment</span>
+                  <strong id="containmentScore">22m</strong>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="lower-grid">
+            <section class="queue-panel" aria-label="Incident queue">
+              <div class="panel-heading">
+                <span>Incident Queue</span>
+                <strong id="queueCount">4 signals</strong>
+              </div>
+              <div class="incident-list" id="incidentList"></div>
+            </section>
+
+            <section class="playbook-panel" aria-label="Mitigation playbook">
+              <div class="panel-heading">
+                <span>Mitigation Path</span>
+                <strong id="playbookClock">48m</strong>
+              </div>
+              <ol class="playbook-list" id="playbookList"></ol>
+            </section>
+
+            <section class="forecast-panel" aria-label="Forward resilience">
+              <div class="panel-heading">
+                <span>Future Controls</span>
+                <strong id="futureScore">+18%</strong>
+              </div>
+              <canvas id="forecastCanvas" width="760" height="320"></canvas>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
