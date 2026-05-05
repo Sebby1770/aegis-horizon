@@ -34,6 +34,10 @@ npm test
 
 The validation script checks that the static app files exist, the scenario catalog is present, and the HTML references local assets only.
 
+## Publish on GitHub Pages
+
+In the repository settings, set Pages to deploy from the `main` branch and the repository root. The app is fully static, so no build command is required.
+
 ## Project structure
 
 ```text
