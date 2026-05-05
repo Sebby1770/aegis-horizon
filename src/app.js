@@ -1,173 +1,193 @@
-import { controlWeights, modeProfiles, scenarios } from "./data.js";
+import { controlWeights, horizonProfiles, lenses, missions } from "./data.js";
+
+const profileStorageKey = "aegis-horizon-twin-profile";
 
 const state = {
-  scenario: "identity",
-  mode: "monitor",
+  mission: "caremesh",
+  lens: "board",
   horizon: 90,
-  ranges: {
-    identity: 42,
-    cloud: 35,
-    data: 58
+  pressure: {
+    agent: 52,
+    supplier: 44,
+    data: 61
   },
   controls: {
-    mfa: true,
-    edr: true,
-    backups: true,
-    secrets: false
+    approvals: true,
+    recovery: true,
+    attestation: false,
+    privacy: true
   },
-  pulse: 0
-};
-
-const profileStorageKey = "aegis-horizon-profile";
-
-const horizonProfiles = {
-  30: { label: "30d", riskPressure: -2, futureBoost: 0.92, caption: "Near-term control maturity projection" },
-  90: { label: "90d", riskPressure: 2, futureBoost: 1, caption: "Quarterly control maturity projection" },
-  180: { label: "180d", riskPressure: 7, futureBoost: 1.12, caption: "Long-range resilience projection" }
+  pulse: 0,
+  frameTime: 0
 };
 
 const els = {
-  scenarioButtons: document.querySelector("#scenarioButtons"),
-  scenarioCode: document.querySelector("#scenarioCode"),
-  scenarioTitle: document.querySelector("#scenarioTitle"),
-  missionSubtitle: document.querySelector("#missionSubtitle"),
-  modeLabel: document.querySelector("#modeLabel"),
+  missionButtons: document.querySelector("#missionButtons"),
+  missionCode: document.querySelector("#missionCode"),
+  missionTitle: document.querySelector("#missionTitle"),
+  missionBrief: document.querySelector("#missionBrief"),
+  sectorLabel: document.querySelector("#sectorLabel"),
+  lensLabel: document.querySelector("#lensLabel"),
   horizonLabel: document.querySelector("#horizonLabel"),
-  exposureValue: document.querySelector("#exposureValue"),
+  pressureValue: document.querySelector("#pressureValue"),
   coverageScore: document.querySelector("#coverageScore"),
-  signalScore: document.querySelector("#signalScore"),
-  assetCount: document.querySelector("#assetCount"),
-  mttrScore: document.querySelector("#mttrScore"),
-  autonomyScore: document.querySelector("#autonomyScore"),
-  riskRing: document.querySelector("#riskRing"),
-  riskScore: document.querySelector("#riskScore"),
-  riskHeadline: document.querySelector("#riskHeadline"),
-  riskSummary: document.querySelector("#riskSummary"),
-  futureNote: document.querySelector("#futureNote"),
-  blastRadius: document.querySelector("#blastRadius"),
-  trustCoverage: document.querySelector("#trustCoverage"),
-  containmentScore: document.querySelector("#containmentScore"),
-  mapLabel: document.querySelector("#mapLabel"),
-  mapState: document.querySelector("#mapState"),
+  integrityStatus: document.querySelector("#integrityStatus"),
+  decisionStatus: document.querySelector("#decisionStatus"),
+  continuityStatus: document.querySelector("#continuityStatus"),
+  evidenceStatus: document.querySelector("#evidenceStatus"),
+  twinCanvas: document.querySelector("#twinCanvas"),
+  continuityCanvas: document.querySelector("#continuityCanvas"),
+  crownLabel: document.querySelector("#crownLabel"),
+  promiseLabel: document.querySelector("#promiseLabel"),
   mapTelemetry: document.querySelector("#mapTelemetry"),
-  incidentList: document.querySelector("#incidentList"),
-  queueCount: document.querySelector("#queueCount"),
-  playbookList: document.querySelector("#playbookList"),
-  playbookClock: document.querySelector("#playbookClock"),
-  futureScore: document.querySelector("#futureScore"),
-  forecastCaption: document.querySelector("#forecastCaption"),
-  autopilotList: document.querySelector("#autopilotList"),
-  autopilotState: document.querySelector("#autopilotState"),
+  integrityRing: document.querySelector("#integrityRing"),
+  integrityScore: document.querySelector("#integrityScore"),
+  decisionHeadline: document.querySelector("#decisionHeadline"),
+  decisionSummary: document.querySelector("#decisionSummary"),
+  horizonCaption: document.querySelector("#horizonCaption"),
+  decisionLoad: document.querySelector("#decisionLoad"),
+  safeguardMetric: document.querySelector("#safeguardMetric"),
+  recoveryWindow: document.querySelector("#recoveryWindow"),
+  timelineClock: document.querySelector("#timelineClock"),
+  timelineList: document.querySelector("#timelineList"),
+  policyState: document.querySelector("#policyState"),
+  policyList: document.querySelector("#policyList"),
+  signalScore: document.querySelector("#signalScore"),
+  signalList: document.querySelector("#signalList"),
+  evidenceCount: document.querySelector("#evidenceCount"),
+  evidenceList: document.querySelector("#evidenceList"),
   profileState: document.querySelector("#profileState"),
-  identityRange: document.querySelector("#identityRange"),
-  cloudRange: document.querySelector("#cloudRange"),
+  agentRange: document.querySelector("#agentRange"),
+  supplierRange: document.querySelector("#supplierRange"),
   dataRange: document.querySelector("#dataRange"),
-  threatCanvas: document.querySelector("#threatCanvas"),
-  forecastCanvas: document.querySelector("#forecastCanvas"),
-  forecastButton: document.querySelector("#forecastButton"),
+  rehearseButton: document.querySelector("#rehearseButton"),
   exportButton: document.querySelector("#exportButton"),
   saveProfileButton: document.querySelector("#saveProfileButton"),
   loadProfileButton: document.querySelector("#loadProfileButton")
 };
 
-const threatCtx = els.threatCanvas.getContext("2d");
-const forecastCtx = els.forecastCanvas.getContext("2d");
+const twinCtx = els.twinCanvas.getContext("2d");
+const continuityCtx = els.continuityCanvas.getContext("2d");
+
 const colors = {
-  background: "#111412",
-  grid: "rgba(242, 244, 232, 0.08)",
-  text: "#F2F4E8",
-  muted: "#9DA89D",
-  safe: "#7CFFB2",
-  watch: "#FFB84C",
-  hot: "#FF5D73",
-  cool: "#2ED3FF"
+  background: "#0f1214",
+  panel: "#14191a",
+  line: "rgba(232, 239, 223, 0.13)",
+  grid: "rgba(232, 239, 223, 0.07)",
+  text: "#f3f6ea",
+  muted: "#9aa59a",
+  safe: "#8ff0b1",
+  cyan: "#47d6ff",
+  amber: "#ffbf5a",
+  red: "#ff667d",
+  blue: "#91a7ff",
+  violet: "#c59bff"
+};
+
+const typeColor = {
+  identity: colors.cyan,
+  agent: colors.blue,
+  device: colors.amber,
+  data: colors.violet,
+  crown: colors.safe,
+  recovery: colors.safe,
+  policy: colors.violet,
+  edge: colors.cyan
 };
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-function activeScenario() {
-  return scenarios[state.scenario];
+function mission() {
+  return missions[state.mission];
 }
 
-function horizonProfile() {
+function lens() {
+  return lenses[state.lens];
+}
+
+function horizon() {
   return horizonProfiles[state.horizon] ?? horizonProfiles[90];
 }
 
+function pressureScore() {
+  return Math.round((state.pressure.agent + state.pressure.supplier + state.pressure.data) / 3);
+}
+
 function coverage() {
-  const enabled = Object.entries(state.controls).reduce((total, [key, isOn]) => {
-    return total + (isOn ? controlWeights[key] : 0);
+  const enabled = Object.entries(state.controls).reduce((total, [key, enabled]) => {
+    return total + (enabled ? controlWeights[key] : 0);
   }, 0);
   const total = Object.values(controlWeights).reduce((sum, value) => sum + value, 0);
   return Math.round((enabled / total) * 100);
 }
 
-function exposure() {
-  return Math.round((state.ranges.identity + state.ranges.cloud + state.ranges.data) / 3);
-}
-
-function riskScore() {
-  const scenario = activeScenario();
-  const horizon = horizonProfile();
-  const exposurePressure =
-    state.ranges.identity * 0.17 +
-    state.ranges.cloud * 0.14 +
-    state.ranges.data * 0.12;
-  const coverageRelief = coverage() * 0.24;
-  const modeShift = modeProfiles[state.mode].riskShift;
-  const longRangePressure = exposure() > 62 ? Math.round((state.horizon / 180) * 5) : 0;
+function integrityScore() {
+  const active = mission();
+  const pressurePenalty =
+    state.pressure.agent * 0.15 + state.pressure.supplier * 0.12 + state.pressure.data * 0.11;
+  const safeguardLift = coverage() * 0.28;
+  const recoveryLift = state.controls.recovery ? 4 : -4;
+  const attestationLift = state.controls.attestation ? 4 : -3;
   return clamp(
-    Math.round(scenario.baseRisk + exposurePressure - coverageRelief + modeShift + horizon.riskPressure + longRangePressure),
-    8,
-    97
+    Math.round(active.baseIntegrity + safeguardLift - pressurePenalty - horizon().drift + lens().integrityShift + recoveryLift + attestationLift),
+    12,
+    98
   );
 }
 
-function riskBand(score) {
-  if (score >= 72) return "Critical";
-  if (score >= 52) return "Medium";
-  if (score >= 32) return "Managed";
-  return "Low";
+function continuityScore() {
+  const active = mission();
+  const recoveryLift = state.controls.recovery ? 10 : -8;
+  const privacyLift = state.controls.privacy ? 3 : -4;
+  return clamp(Math.round(active.continuity + coverage() * 0.16 - pressureScore() * 0.13 - horizon().drift + recoveryLift + privacyLift), 8, 98);
 }
 
-function riskColor(score) {
-  if (score >= 72) return colors.hot;
-  if (score >= 52) return colors.watch;
-  return colors.safe;
+function decisionLoad() {
+  const horizonLoad = state.horizon === 180 ? 10 : state.horizon === 30 ? -2 : 4;
+  return clamp(Math.round(12 + pressureScore() * 0.34 + mission().nodes.length + lens().loadShift + horizonLoad - coverage() * 0.09), 4, 72);
 }
 
-function containmentMinutes() {
-  const scenario = activeScenario();
-  const score = riskScore();
-  const modeFactor = modeProfiles[state.mode].containment;
-  const controlFactor = 1 - coverage() / 300;
-  const horizonFactor = state.horizon === 180 ? 1.08 : state.horizon === 30 ? 0.94 : 1;
-  return clamp(Math.round((scenario.mttr + score * 0.25) * modeFactor * controlFactor * horizonFactor), 8, 90);
+function evidenceReady() {
+  return Object.values(state.controls).filter(Boolean).length;
 }
 
-function autonomyScore() {
-  const modeBonus = { monitor: 0, harden: 5, contain: 9 }[state.mode];
-  const secretBonus = state.controls.secrets ? 8 : -4;
-  return clamp(Math.round(46 + coverage() * 0.42 - riskScore() * 0.16 - exposure() * 0.08 + modeBonus + secretBonus), 18, 98);
+function signalScore() {
+  return clamp(mission().signal + Math.round((coverage() - 70) / 5) - Math.round((pressureScore() - 50) / 8), 42, 99);
 }
 
-function futureLift() {
-  const future = activeScenario().future;
-  const horizonBoost = state.horizon === 180 ? 7 : state.horizon === 30 ? -3 : 0;
-  return Math.max(8, future[future.length - 1] - future[0] - Math.round(riskScore() / 12) + horizonBoost);
+function recoveryWindow() {
+  const lastStep = mission().timeline.at(-1)?.[0] ?? "30m";
+  const baseline = Number.parseInt(lastStep, 10) || 30;
+  const delay = Math.max(0, Math.round((decisionLoad() - 24) / 3));
+  return clamp(baseline + delay - (state.controls.recovery ? 5 : 0), 12, 96);
+}
+
+function band(score) {
+  if (score >= 82) return "Resilient";
+  if (score >= 66) return "Ready";
+  if (score >= 48) return "Tense";
+  return "Fragile";
+}
+
+function decisionHeadline(score) {
+  if (score >= 82) return "Resilient by design";
+  if (score >= 66) return "Continuity-first posture";
+  if (score >= 48) return "Decision friction building";
+  return "Policy debt is visible";
+}
+
+function decisionSummary(score) {
+  const active = mission();
+  if (score >= 82) return `${active.crownJewel} has enough evidence for a high-confidence ${lens().caption.toLowerCase()}.`;
+  if (score >= 66) return `${active.crownJewel} is defensible, but the next rehearsal should reduce authority and supplier ambiguity.`;
+  if (score >= 48) return `${active.crownJewel} needs clearer approval paths before the ${horizon().label} horizon arrives.`;
+  return `${active.crownJewel} should not absorb more autonomy until missing safeguards are restored.`;
 }
 
 function formatNumber(value) {
   return new Intl.NumberFormat("en").format(value);
-}
-
-function setPressed(buttons, activeValue, dataName) {
-  buttons.forEach((button) => {
-    const active = button.dataset[dataName] === String(activeValue);
-    button.classList.toggle("is-active", active);
-    button.setAttribute("aria-pressed", String(active));
-  });
 }
 
 function escapeHtml(value) {
@@ -182,135 +202,156 @@ function escapeHtml(value) {
   });
 }
 
-function renderScenarioButtons() {
-  els.scenarioButtons.innerHTML = Object.entries(scenarios)
-    .map(([key, scenario]) => {
-      const active = key === state.scenario ? " is-active" : "";
-      const pressed = key === state.scenario ? "true" : "false";
+function setPressed(buttons, activeValue, dataName) {
+  buttons.forEach((button) => {
+    const active = button.dataset[dataName] === String(activeValue);
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+}
+
+function renderMissionButtons() {
+  els.missionButtons.innerHTML = Object.entries(missions)
+    .map(([key, item]) => {
+      const active = key === state.mission ? " is-active" : "";
+      const pressed = key === state.mission ? "true" : "false";
       return `
-        <button class="scenario-button${active}" type="button" data-scenario="${key}" aria-pressed="${pressed}">
-          <span aria-hidden="true">${scenario.code.split("-")[0]}</span>
-          <strong>${scenario.label}</strong>
+        <button class="mission-button${active}" type="button" data-mission="${key}" aria-pressed="${pressed}">
+          <span aria-hidden="true">${escapeHtml(item.code.split("-")[0])}</span>
+          <strong>${escapeHtml(item.label)}</strong>
+          <small>${escapeHtml(item.sector)}</small>
         </button>
       `;
     })
     .join("");
 }
 
-function renderIncidents(score) {
-  const severityRank = { High: 3, Medium: 2, Low: 1 };
-  const incidents = [...activeScenario().incidents].sort((a, b) => severityRank[b[0]] - severityRank[a[0]]);
-  els.queueCount.textContent = `${incidents.length} signals`;
-  els.incidentList.innerHTML = incidents
-    .map(([severity, title], index) => {
-      const heat = severity === "High" || score > 70 ? "hot" : severity === "Medium" ? "watch" : "safe";
+function generatedPolicies(score) {
+  const active = mission();
+  const policies = [];
+
+  if (!state.controls.approvals) policies.push(`IF ${active.crownJewel} changes THEN require named owner approval before action.`);
+  if (!state.controls.recovery) policies.push("IF continuity confidence drops THEN activate an offline recovery owner before automation proceeds.");
+  if (!state.controls.attestation) policies.push("IF a system writes to a crown-jewel path THEN attach signed evidence to the decision record.");
+  if (!state.controls.privacy) policies.push("IF people or sensitive context appears THEN enforce a privacy boundary before publishing.");
+  if (state.pressure.agent > 64) policies.push("IF agent authority rises above threshold THEN convert high-impact actions to draft-only mode.");
+  if (state.pressure.supplier > 64) policies.push("IF supplier coupling rises THEN require provenance before system-to-system trust.");
+  if (score < 55) policies.push("IF integrity is tense THEN pause new autonomy until safeguards are restored.");
+
+  return [...policies, ...active.policies].slice(0, 5);
+}
+
+function renderPolicy(score) {
+  const rules = generatedPolicies(score);
+  els.policyState.textContent = score >= 66 ? "Compiled" : "Repair";
+  els.policyList.innerHTML = rules
+    .map((rule, index) => {
       return `
-        <article class="incident-row" data-heat="${heat}">
+        <article class="policy-row">
           <span>${String(index + 1).padStart(2, "0")}</span>
-          <div>
-            <strong>${title}</strong>
-            <small>${severity} priority</small>
-          </div>
+          <p>${escapeHtml(rule)}</p>
         </article>
       `;
     })
     .join("");
 }
 
-function renderPlaybook(minutes) {
-  els.playbookClock.textContent = `${minutes + 26}m`;
-  els.playbookList.innerHTML = activeScenario().playbook
-    .map((item, index) => `<li><span>${index + 1}</span><p>${escapeHtml(item)}</p></li>`)
-    .join("");
-}
-
-function recommendedActions(score) {
-  const actions = [];
-
-  if (!state.controls.mfa) actions.push("Reinstate phishing-resistant MFA for all privileged paths");
-  if (!state.controls.edr) actions.push("Restore endpoint telemetry before expanding autonomous response");
-  if (!state.controls.backups) actions.push("Verify restore integrity against the most critical services");
-  if (!state.controls.secrets) actions.push("Rotate high-value secrets and shorten delegated token life");
-  if (state.ranges.identity > 64) actions.push("Compress dormant identity access and require step-up checks");
-  if (state.ranges.cloud > 64) actions.push("Reconcile cloud drift against approved infrastructure state");
-  if (state.ranges.data > 64) actions.push("Reduce sensitive data concentration before long-range exposure grows");
-  if (score >= 72) actions.push("Move response mode to containment until the queue cools below critical");
-
-  activeScenario().playbook.forEach((item) => actions.push(item));
-
-  return [...new Set(actions)].slice(0, 4);
-}
-
-function renderAutopilot(score) {
-  els.autopilotState.textContent = score >= 72 ? "Act now" : score >= 52 ? "Tune" : "Ready";
-  els.autopilotList.innerHTML = recommendedActions(score)
-    .map((action, index) => {
+function renderTimeline() {
+  const loadDelay = Math.max(0, Math.round((decisionLoad() - 20) / 6));
+  els.timelineClock.textContent = `${recoveryWindow()}m`;
+  els.timelineList.innerHTML = mission().timeline
+    .map(([time, action], index) => {
+      const minutes = Number.parseInt(time, 10) + index * loadDelay;
       return `
-        <article class="autopilot-row">
-          <span>${String(index + 1).padStart(2, "0")}</span>
+        <li>
+          <span>${String(minutes).padStart(2, "0")}m</span>
           <p>${escapeHtml(action)}</p>
+        </li>
+      `;
+    })
+    .join("");
+}
+
+function renderSignals() {
+  const score = signalScore();
+  els.signalScore.textContent = `${score}%`;
+  els.signalList.innerHTML = mission().signals
+    .map((signal, index) => {
+      const heat = index === 0 && pressureScore() > 58 ? "hot" : index === 1 ? "watch" : "safe";
+      return `
+        <article class="signal-row" data-heat="${heat}">
+          <strong>${escapeHtml(signal)}</strong>
         </article>
       `;
     })
     .join("");
 }
 
-function forecastData() {
-  const horizon = horizonProfile();
-  const controlBoost = coverage() * 0.08;
-  const riskDrag = riskScore() * 0.05;
-  const exposureDrag = Math.max(0, exposure() - 50) * 0.04;
-  return activeScenario().future.map((value, index) => {
-    const horizonSlope = state.horizon === 180 ? index * 1.2 : state.horizon === 30 ? index * -0.35 : index * 0.35;
-    return clamp(value * horizon.futureBoost + controlBoost - riskDrag - exposureDrag + horizonSlope, 10, 98);
+function renderEvidence() {
+  const ready = evidenceReady();
+  const active = mission();
+  els.evidenceCount.textContent = `${active.evidence.length} items`;
+  els.evidenceStatus.textContent = `${ready}/${active.evidence.length}`;
+  els.evidenceList.innerHTML = active.evidence
+    .map((item, index) => {
+      const complete = index < ready;
+      return `
+        <article class="evidence-row" data-ready="${complete}">
+          <span aria-hidden="true">${complete ? "OK" : "..."}</span>
+          <strong>${escapeHtml(item)}</strong>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function futureSeries() {
+  const active = mission();
+  const controlLift = coverage() * 0.06;
+  const pressureDrag = Math.max(0, pressureScore() - 45) * 0.12;
+  return active.future.map((value, index) => {
+    const horizonSlope = state.horizon === 180 ? index * 1.6 : state.horizon === 30 ? index * -0.45 : index * 0.55;
+    return clamp(value * horizon().maturity + controlLift - pressureDrag + horizonSlope, 8, 98);
   });
 }
 
-function futureNote(score) {
-  const band = riskBand(score).toLowerCase();
-  if (state.horizon === 180) return `180-day ${band} posture with long-range drift pressure.`;
-  if (state.horizon === 30) return `30-day ${band} posture focused on immediate containment.`;
-  return `90-day ${band} posture with quarterly resilience lift.`;
-}
-
 function renderDashboard() {
-  const scenario = activeScenario();
-  const score = riskScore();
+  const active = mission();
+  const score = integrityScore();
   const cover = coverage();
-  const minutes = containmentMinutes();
-  const horizon = horizonProfile();
+  const continuity = continuityScore();
 
-  els.scenarioCode.textContent = scenario.code;
-  els.scenarioTitle.textContent = scenario.title;
-  els.missionSubtitle.textContent = `${horizon.label} local-only posture forecast`;
-  els.mapLabel.textContent = scenario.mapLabel;
-  els.mapState.textContent = state.mode === "contain" ? "Containment live" : state.mode === "harden" ? "Hardening wave" : "Active watch";
-  els.mapTelemetry.textContent = `${scenario.nodes.length} nodes, ${scenario.links.length} trust paths`;
-  els.modeLabel.textContent = modeProfiles[state.mode].label;
-  els.horizonLabel.textContent = horizon.label;
-  els.exposureValue.textContent = String(exposure());
+  els.missionCode.textContent = active.code;
+  els.sectorLabel.textContent = active.sector;
+  els.missionTitle.textContent = active.title;
+  els.missionBrief.textContent = active.brief;
+  els.lensLabel.textContent = lens().label;
+  els.horizonLabel.textContent = horizon().label;
+  els.pressureValue.textContent = String(pressureScore());
   els.coverageScore.textContent = `${cover}%`;
-  els.signalScore.textContent = `${clamp(scenario.signal + Math.round((cover - 70) / 4), 44, 99)}%`;
-  els.assetCount.textContent = formatNumber(scenario.assets + Math.round(exposure() * 9));
-  els.mttrScore.textContent = `${minutes}m`;
-  els.autonomyScore.textContent = `${autonomyScore()}%`;
 
-  els.riskRing.style.setProperty("--risk", score);
-  els.riskRing.style.setProperty("--risk-color", riskColor(score));
-  els.riskScore.textContent = String(score);
-  els.riskHeadline.textContent = scenario.headline;
-  els.riskSummary.textContent = scenario.summary;
-  els.futureNote.textContent = futureNote(score);
-  els.blastRadius.textContent = riskBand(score);
-  els.trustCoverage.textContent = `${cover}%`;
-  els.containmentScore.textContent = `${minutes}m`;
-  els.futureScore.textContent = `+${futureLift()}%`;
-  els.forecastCaption.textContent = horizon.caption;
+  els.integrityStatus.textContent = `${score}%`;
+  els.decisionStatus.textContent = String(decisionLoad());
+  els.continuityStatus.textContent = `${continuity}%`;
+  els.crownLabel.textContent = active.crownJewel;
+  els.promiseLabel.textContent = active.promise;
+  els.mapTelemetry.textContent = `${active.nodes.length} assets, ${active.links.length} trust paths`;
 
-  renderIncidents(score);
-  renderPlaybook(minutes);
-  renderAutopilot(score);
-  drawForecast();
+  els.integrityRing.style.setProperty("--integrity", score);
+  els.integrityRing.style.setProperty("--integrity-color", score >= 66 ? colors.safe : score >= 48 ? colors.amber : colors.red);
+  els.integrityScore.textContent = String(score);
+  els.decisionHeadline.textContent = decisionHeadline(score);
+  els.decisionSummary.textContent = decisionSummary(score);
+  els.horizonCaption.textContent = `${horizon().caption} via ${lens().caption.toLowerCase()}`;
+  els.decisionLoad.textContent = `${decisionLoad()} moves`;
+  els.safeguardMetric.textContent = `${cover}%`;
+  els.recoveryWindow.textContent = `${recoveryWindow()}m`;
+
+  renderTimeline();
+  renderPolicy(score);
+  renderSignals();
+  renderEvidence();
+  drawContinuity();
 }
 
 function resizeCanvas(canvas, ctx) {
@@ -326,17 +367,17 @@ function resizeCanvas(canvas, ctx) {
   return rect;
 }
 
-function drawGrid(ctx, width, height) {
+function drawGrid(ctx, width, height, spacing = 44) {
   ctx.save();
   ctx.strokeStyle = colors.grid;
   ctx.lineWidth = 1;
-  for (let x = 0; x < width; x += 42) {
+  for (let x = 0; x < width; x += spacing) {
     ctx.beginPath();
     ctx.moveTo(x, 0);
     ctx.lineTo(x, height);
     ctx.stroke();
   }
-  for (let y = 0; y < height; y += 42) {
+  for (let y = 0; y < height; y += spacing) {
     ctx.beginPath();
     ctx.moveTo(0, y);
     ctx.lineTo(width, y);
@@ -349,182 +390,204 @@ function nodeById(nodes, id) {
   return nodes.find((node) => node.id === id);
 }
 
-function drawThreatMap() {
-  const rect = resizeCanvas(els.threatCanvas, threatCtx);
+function drawDiamond(ctx, x, y, radius) {
+  ctx.beginPath();
+  ctx.moveTo(x, y - radius);
+  ctx.lineTo(x + radius, y);
+  ctx.lineTo(x, y + radius);
+  ctx.lineTo(x - radius, y);
+  ctx.closePath();
+}
+
+function drawHex(ctx, x, y, radius) {
+  ctx.beginPath();
+  for (let i = 0; i < 6; i += 1) {
+    const angle = Math.PI / 6 + (Math.PI * 2 * i) / 6;
+    const px = x + Math.cos(angle) * radius;
+    const py = y + Math.sin(angle) * radius;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+}
+
+function drawNodeShape(ctx, node, x, y, radius) {
+  if (node.type === "crown" || node.type === "policy") {
+    drawDiamond(ctx, x, y, radius);
+    return;
+  }
+  if (node.type === "agent" || node.type === "device") {
+    drawHex(ctx, x, y, radius);
+    return;
+  }
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+}
+
+function drawTwin(timestamp = 0) {
+  if (timestamp - state.frameTime < 32) {
+    requestAnimationFrame(drawTwin);
+    return;
+  }
+  state.frameTime = timestamp;
+
+  const rect = resizeCanvas(els.twinCanvas, twinCtx);
   const width = rect.width;
   const height = rect.height;
-  const scenario = activeScenario();
-  const score = riskScore();
+  const active = mission();
+  const score = integrityScore();
   const pulse = state.pulse;
 
-  threatCtx.clearRect(0, 0, width, height);
-  threatCtx.fillStyle = colors.background;
-  threatCtx.fillRect(0, 0, width, height);
-  drawGrid(threatCtx, width, height);
+  twinCtx.clearRect(0, 0, width, height);
+  twinCtx.fillStyle = colors.background;
+  twinCtx.fillRect(0, 0, width, height);
+  drawGrid(twinCtx, width, height);
 
-  const nodes = scenario.nodes.map((node) => ({
+  const sweepX = (pulse * 1.4) % Math.max(width, 1);
+  twinCtx.save();
+  twinCtx.fillStyle = "rgba(71, 214, 255, 0.05)";
+  twinCtx.fillRect(sweepX - 46, 0, 92, height);
+  twinCtx.strokeStyle = "rgba(71, 214, 255, 0.25)";
+  twinCtx.beginPath();
+  twinCtx.moveTo(sweepX, 0);
+  twinCtx.lineTo(sweepX, height);
+  twinCtx.stroke();
+  twinCtx.restore();
+
+  const nodes = active.nodes.map((node) => ({
     ...node,
     px: node.x * width,
     py: node.y * height
   }));
 
-  threatCtx.save();
-  threatCtx.lineCap = "round";
-  scenario.links.forEach(([fromId, toId], index) => {
+  twinCtx.save();
+  twinCtx.lineCap = "round";
+  active.links.forEach(([fromId, toId, label], index) => {
     const from = nodeById(nodes, fromId);
     const to = nodeById(nodes, toId);
-    const intensity = (Math.sin(pulse * 0.045 + index) + 1) / 2;
-    threatCtx.strokeStyle = `rgba(46, 211, 255, ${0.16 + intensity * 0.28})`;
-    threatCtx.lineWidth = 2 + intensity * 2;
-    threatCtx.beginPath();
-    threatCtx.moveTo(from.px, from.py);
-    threatCtx.bezierCurveTo(
-      (from.px + to.px) / 2,
-      from.py - 64 + intensity * 32,
-      (from.px + to.px) / 2,
-      to.py + 64 - intensity * 28,
-      to.px,
-      to.py
-    );
-    threatCtx.stroke();
+    const activity = (Math.sin(pulse * 0.038 + index * 0.9) + 1) / 2;
+    const heat = clamp((pressureScore() / 100 + (from.weight + to.weight) / 2) / 2, 0, 1);
+    const linkColor = heat > 0.7 ? colors.red : heat > 0.56 ? colors.amber : colors.cyan;
+    const midX = (from.px + to.px) / 2;
+    const midY = (from.py + to.py) / 2;
+    const curve = (index % 2 === 0 ? -1 : 1) * (36 + activity * 18);
 
-    const t = (pulse * 0.01 + index * 0.17) % 1;
+    twinCtx.strokeStyle = linkColor === colors.red
+      ? `rgba(255, 102, 125, ${0.16 + activity * 0.3})`
+      : linkColor === colors.amber
+        ? `rgba(255, 191, 90, ${0.18 + activity * 0.3})`
+        : `rgba(71, 214, 255, ${0.17 + activity * 0.26})`;
+    twinCtx.lineWidth = 2 + activity * 2.3;
+    twinCtx.beginPath();
+    twinCtx.moveTo(from.px, from.py);
+    twinCtx.quadraticCurveTo(midX, midY + curve, to.px, to.py);
+    twinCtx.stroke();
+
+    const gateSize = 6 + coverage() / 18;
+    twinCtx.save();
+    twinCtx.translate(midX, midY + curve * 0.42);
+    twinCtx.rotate(Math.PI / 4);
+    twinCtx.fillStyle = state.controls.attestation ? "rgba(143, 240, 177, 0.85)" : "rgba(255, 191, 90, 0.75)";
+    twinCtx.fillRect(-gateSize / 2, -gateSize / 2, gateSize, gateSize);
+    twinCtx.restore();
+
+    const t = (pulse * 0.008 + index * 0.14) % 1;
     const particleX = from.px + (to.px - from.px) * t;
-    const particleY = from.py + (to.py - from.py) * t;
-    threatCtx.fillStyle = riskColor(score);
-    threatCtx.beginPath();
-    threatCtx.arc(particleX, particleY, 3.4, 0, Math.PI * 2);
-    threatCtx.fill();
+    const particleY = from.py + (to.py - from.py) * t + Math.sin(t * Math.PI) * curve * 0.55;
+    twinCtx.fillStyle = score >= 66 ? colors.safe : score >= 48 ? colors.amber : colors.red;
+    twinCtx.beginPath();
+    twinCtx.arc(particleX, particleY, 3.4, 0, Math.PI * 2);
+    twinCtx.fill();
+
+    if (width > 620) {
+      twinCtx.fillStyle = colors.muted;
+      twinCtx.font = "600 11px Inter, ui-sans-serif, system-ui, sans-serif";
+      twinCtx.textAlign = "center";
+      twinCtx.fillText(label, midX, midY + curve * 0.42 - 12);
+    }
   });
-  threatCtx.restore();
+  twinCtx.restore();
 
   nodes.forEach((node, index) => {
-    const nodeRisk = clamp(node.weight * 100 + score * 0.18, 0, 100);
-    const radius = 20 + node.weight * 20 + Math.sin(pulse * 0.035 + index) * 2;
-    const color = nodeRisk > 70 ? colors.hot : nodeRisk > 52 ? colors.watch : colors.safe;
+    const nodeScore = clamp(node.weight * 100 + pressureScore() * 0.18 - coverage() * 0.08, 5, 98);
+    const radius = 19 + node.weight * 17 + Math.sin(pulse * 0.035 + index) * 1.8;
+    const color = typeColor[node.type] ?? colors.cyan;
 
-    threatCtx.save();
-    threatCtx.shadowColor = color;
-    threatCtx.shadowBlur = 18;
-    threatCtx.fillStyle = "rgba(17, 20, 18, 0.92)";
-    threatCtx.strokeStyle = color;
-    threatCtx.lineWidth = 2;
-    threatCtx.beginPath();
-    threatCtx.arc(node.px, node.py, radius, 0, Math.PI * 2);
-    threatCtx.fill();
-    threatCtx.stroke();
-    threatCtx.shadowBlur = 0;
+    twinCtx.save();
+    twinCtx.shadowColor = color;
+    twinCtx.shadowBlur = node.type === "crown" ? 24 : 14;
+    twinCtx.fillStyle = colors.panel;
+    twinCtx.strokeStyle = color;
+    twinCtx.lineWidth = node.type === "crown" ? 3 : 2;
+    drawNodeShape(twinCtx, node, node.px, node.py, radius);
+    twinCtx.fill();
+    twinCtx.stroke();
+    twinCtx.shadowBlur = 0;
 
-    threatCtx.fillStyle = colors.text;
-    threatCtx.font = "700 13px Inter, ui-sans-serif, system-ui, sans-serif";
-    threatCtx.textAlign = "center";
-    threatCtx.fillText(node.id, node.px, node.py + radius + 22);
-    threatCtx.fillStyle = colors.muted;
-    threatCtx.font = "600 11px Inter, ui-sans-serif, system-ui, sans-serif";
-    threatCtx.fillText(`${Math.round(nodeRisk)}%`, node.px, node.py + 4);
-    threatCtx.restore();
+    if (node.type === "crown") {
+      twinCtx.strokeStyle = `rgba(143, 240, 177, ${0.28 + Math.sin(pulse * 0.04) * 0.08})`;
+      twinCtx.lineWidth = 2;
+      twinCtx.beginPath();
+      twinCtx.arc(node.px, node.py, radius + 20, 0, Math.PI * 2);
+      twinCtx.stroke();
+    }
+
+    twinCtx.fillStyle = colors.text;
+    twinCtx.font = "800 12px Inter, ui-sans-serif, system-ui, sans-serif";
+    twinCtx.textAlign = "center";
+    twinCtx.fillText(node.label, node.px, node.py + radius + 22);
+    twinCtx.fillStyle = colors.muted;
+    twinCtx.font = "700 11px Inter, ui-sans-serif, system-ui, sans-serif";
+    twinCtx.fillText(`${Math.round(nodeScore)}%`, node.px, node.py + 4);
+    twinCtx.restore();
   });
 
   state.pulse += 1;
-  requestAnimationFrame(drawThreatMap);
+  requestAnimationFrame(drawTwin);
 }
 
-function drawForecast() {
-  const rect = resizeCanvas(els.forecastCanvas, forecastCtx);
+function drawContinuity() {
+  const rect = resizeCanvas(els.continuityCanvas, continuityCtx);
   const width = rect.width;
   const height = rect.height;
-  const data = forecastData();
-  const padding = 28;
+  const data = futureSeries();
+  const padding = 24;
   const innerWidth = width - padding * 2;
   const innerHeight = height - padding * 2;
 
-  forecastCtx.clearRect(0, 0, width, height);
-  forecastCtx.fillStyle = "#151916";
-  forecastCtx.fillRect(0, 0, width, height);
-  drawGrid(forecastCtx, width, height);
+  continuityCtx.clearRect(0, 0, width, height);
+  continuityCtx.fillStyle = "#111618";
+  continuityCtx.fillRect(0, 0, width, height);
+  drawGrid(continuityCtx, width, height, 38);
 
-  forecastCtx.save();
-  forecastCtx.strokeStyle = "rgba(157, 168, 157, 0.35)";
-  forecastCtx.lineWidth = 1;
-  forecastCtx.beginPath();
-  forecastCtx.moveTo(padding, height - padding);
-  forecastCtx.lineTo(width - padding, height - padding);
-  forecastCtx.stroke();
+  continuityCtx.save();
+  continuityCtx.strokeStyle = "rgba(154, 165, 154, 0.35)";
+  continuityCtx.lineWidth = 1;
+  continuityCtx.beginPath();
+  continuityCtx.moveTo(padding, height - padding);
+  continuityCtx.lineTo(width - padding, height - padding);
+  continuityCtx.stroke();
 
-  forecastCtx.strokeStyle = colors.safe;
-  forecastCtx.lineWidth = 4;
-  forecastCtx.beginPath();
+  continuityCtx.strokeStyle = continuityScore() >= 66 ? colors.safe : colors.amber;
+  continuityCtx.lineWidth = 4;
+  continuityCtx.beginPath();
   data.forEach((value, index) => {
     const x = padding + (innerWidth / (data.length - 1)) * index;
     const y = height - padding - (value / 100) * innerHeight;
-    if (index === 0) {
-      forecastCtx.moveTo(x, y);
-    } else {
-      forecastCtx.lineTo(x, y);
-    }
+    if (index === 0) continuityCtx.moveTo(x, y);
+    else continuityCtx.lineTo(x, y);
   });
-  forecastCtx.stroke();
+  continuityCtx.stroke();
 
   data.forEach((value, index) => {
     const x = padding + (innerWidth / (data.length - 1)) * index;
     const y = height - padding - (value / 100) * innerHeight;
-    forecastCtx.fillStyle = index === data.length - 1 ? colors.watch : colors.cool;
-    forecastCtx.beginPath();
-    forecastCtx.arc(x, y, 5, 0, Math.PI * 2);
-    forecastCtx.fill();
+    continuityCtx.fillStyle = index === data.length - 1 ? colors.amber : colors.cyan;
+    continuityCtx.beginPath();
+    continuityCtx.arc(x, y, 4.8, 0, Math.PI * 2);
+    continuityCtx.fill();
   });
-  forecastCtx.restore();
-}
-
-function runForecastPulse() {
-  els.forecastButton.classList.add("is-busy");
-  const direction = Math.random() > 0.5 ? 4 : -4;
-  state.ranges.identity = clamp(state.ranges.identity + direction, 0, 100);
-  state.ranges.cloud = clamp(state.ranges.cloud + Math.round(direction / 2), 0, 100);
-  els.identityRange.value = String(state.ranges.identity);
-  els.cloudRange.value = String(state.ranges.cloud);
-  markProfileChanged();
-  renderDashboard();
-  window.setTimeout(() => els.forecastButton.classList.remove("is-busy"), 420);
-}
-
-async function digestText(text) {
-  if (!window.crypto?.subtle) return "unavailable";
-  const buffer = await window.crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return [...new Uint8Array(buffer)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-async function exportBrief() {
-  const scenario = activeScenario();
-  const brief = {
-    project: "Aegis Horizon",
-    scenario: scenario.title,
-    code: scenario.code,
-    mode: modeProfiles[state.mode].label,
-    horizonDays: state.horizon,
-    risk: riskScore(),
-    coverage: coverage(),
-    autonomy: autonomyScore(),
-    exposure: exposure(),
-    containmentMinutes: containmentMinutes(),
-    incidents: scenario.incidents,
-    playbook: scenario.playbook,
-    autopilot: recommendedActions(riskScore()),
-    controls: state.controls,
-    ranges: state.ranges,
-    generatedAt: new Date().toISOString()
-  };
-  const digest = await digestText(JSON.stringify(brief));
-  const payload = { ...brief, integrity: { algorithm: "SHA-256", digest } };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `aegis-horizon-${scenario.code.toLowerCase()}-brief.json`;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+  continuityCtx.restore();
 }
 
 function markProfileState(label) {
@@ -537,26 +600,26 @@ function markProfileChanged() {
 
 function profilePayload() {
   return {
-    scenario: state.scenario,
-    mode: state.mode,
+    mission: state.mission,
+    lens: state.lens,
     horizon: state.horizon,
-    ranges: { ...state.ranges },
+    pressure: { ...state.pressure },
     controls: { ...state.controls },
     savedAt: new Date().toISOString()
   };
 }
 
 function updateControlsFromState() {
-  els.identityRange.value = String(state.ranges.identity);
-  els.cloudRange.value = String(state.ranges.cloud);
-  els.dataRange.value = String(state.ranges.data);
+  els.agentRange.value = String(state.pressure.agent);
+  els.supplierRange.value = String(state.pressure.supplier);
+  els.dataRange.value = String(state.pressure.data);
 
   document.querySelectorAll("[data-control]").forEach((input) => {
     input.checked = Boolean(state.controls[input.dataset.control]);
   });
 
-  setPressed([...els.scenarioButtons.querySelectorAll("button")], state.scenario, "scenario");
-  setPressed([...document.querySelectorAll("[data-mode]")], state.mode, "mode");
+  setPressed([...els.missionButtons.querySelectorAll("button")], state.mission, "mission");
+  setPressed([...document.querySelectorAll("[data-lens]")], state.lens, "lens");
   setPressed([...document.querySelectorAll("[data-horizon]")], state.horizon, "horizon");
 }
 
@@ -578,24 +641,24 @@ function loadProfile() {
     }
 
     const profile = JSON.parse(stored);
-    if (!scenarios[profile.scenario] || !modeProfiles[profile.mode] || !horizonProfiles[profile.horizon]) {
+    if (!missions[profile.mission] || !lenses[profile.lens] || !horizonProfiles[profile.horizon]) {
       markProfileState("Invalid");
       return;
     }
 
-    state.scenario = profile.scenario;
-    state.mode = profile.mode;
+    state.mission = profile.mission;
+    state.lens = profile.lens;
     state.horizon = Number(profile.horizon);
-    state.ranges = {
-      identity: clamp(Number(profile.ranges?.identity ?? state.ranges.identity), 0, 100),
-      cloud: clamp(Number(profile.ranges?.cloud ?? state.ranges.cloud), 0, 100),
-      data: clamp(Number(profile.ranges?.data ?? state.ranges.data), 0, 100)
+    state.pressure = {
+      agent: clamp(Number(profile.pressure?.agent ?? state.pressure.agent), 0, 100),
+      supplier: clamp(Number(profile.pressure?.supplier ?? state.pressure.supplier), 0, 100),
+      data: clamp(Number(profile.pressure?.data ?? state.pressure.data), 0, 100)
     };
     state.controls = {
-      mfa: Boolean(profile.controls?.mfa),
-      edr: Boolean(profile.controls?.edr),
-      backups: Boolean(profile.controls?.backups),
-      secrets: Boolean(profile.controls?.secrets)
+      approvals: Boolean(profile.controls?.approvals),
+      recovery: Boolean(profile.controls?.recovery),
+      attestation: Boolean(profile.controls?.attestation),
+      privacy: Boolean(profile.controls?.privacy)
     };
 
     updateControlsFromState();
@@ -614,19 +677,73 @@ function setInitialProfileState() {
   }
 }
 
+function runRehearsal() {
+  els.rehearseButton.classList.add("is-busy");
+  const direction = Math.random() > 0.5 ? 5 : -4;
+  state.pressure.agent = clamp(state.pressure.agent + direction, 0, 100);
+  state.pressure.supplier = clamp(state.pressure.supplier + Math.round(direction / 2), 0, 100);
+  state.pressure.data = clamp(state.pressure.data + (Math.random() > 0.5 ? 3 : -2), 0, 100);
+  updateControlsFromState();
+  markProfileChanged();
+  renderDashboard();
+  window.setTimeout(() => els.rehearseButton.classList.remove("is-busy"), 460);
+}
+
+async function digestText(text) {
+  if (!window.crypto?.subtle) return "unavailable";
+  const buffer = await window.crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(buffer)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function exportPacket() {
+  const active = mission();
+  const payload = {
+    project: "Aegis Horizon",
+    mode: "resilience-twin-studio",
+    mission: active.title,
+    code: active.code,
+    sector: active.sector,
+    crownJewel: active.crownJewel,
+    decisionLens: lens().label,
+    horizonDays: state.horizon,
+    integrity: integrityScore(),
+    continuity: continuityScore(),
+    decisionLoad: decisionLoad(),
+    pressure: { ...state.pressure },
+    safeguards: { ...state.controls },
+    tabletopTimeline: active.timeline,
+    generatedPolicies: generatedPolicies(integrityScore()),
+    futuresSignals: active.signals,
+    evidence: active.evidence,
+    generatedAt: new Date().toISOString()
+  };
+  const digest = await digestText(JSON.stringify(payload));
+  const packet = { ...payload, integrityDigest: { algorithm: "SHA-256", digest } };
+  const blob = new Blob([JSON.stringify(packet, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `aegis-horizon-${active.code.toLowerCase()}-packet.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 function bindEvents() {
-  els.scenarioButtons.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-scenario]");
+  els.missionButtons.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-mission]");
     if (!button) return;
-    state.scenario = button.dataset.scenario;
-    setPressed([...els.scenarioButtons.querySelectorAll("button")], state.scenario, "scenario");
+    state.mission = button.dataset.mission;
+    setPressed([...els.missionButtons.querySelectorAll("button")], state.mission, "mission");
+    markProfileChanged();
     renderDashboard();
   });
 
-  document.querySelectorAll("[data-mode]").forEach((button) => {
+  document.querySelectorAll("[data-lens]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.mode = button.dataset.mode;
-      setPressed([...document.querySelectorAll("[data-mode]")], state.mode, "mode");
+      state.lens = button.dataset.lens;
+      setPressed([...document.querySelectorAll("[data-lens]")], state.lens, "lens");
       markProfileChanged();
       renderDashboard();
     });
@@ -642,12 +759,12 @@ function bindEvents() {
   });
 
   [
-    [els.identityRange, "identity"],
-    [els.cloudRange, "cloud"],
+    [els.agentRange, "agent"],
+    [els.supplierRange, "supplier"],
     [els.dataRange, "data"]
   ].forEach(([input, key]) => {
     input.addEventListener("input", () => {
-      state.ranges[key] = Number(input.value);
+      state.pressure[key] = Number(input.value);
       markProfileChanged();
       renderDashboard();
     });
@@ -661,15 +778,15 @@ function bindEvents() {
     });
   });
 
-  els.forecastButton.addEventListener("click", runForecastPulse);
-  els.exportButton.addEventListener("click", () => void exportBrief());
+  els.rehearseButton.addEventListener("click", runRehearsal);
+  els.exportButton.addEventListener("click", () => void exportPacket());
   els.saveProfileButton.addEventListener("click", saveProfile);
   els.loadProfileButton.addEventListener("click", loadProfile);
-  window.addEventListener("resize", drawForecast);
+  window.addEventListener("resize", drawContinuity);
 }
 
-renderScenarioButtons();
+renderMissionButtons();
 bindEvents();
 setInitialProfileState();
 renderDashboard();
-drawThreatMap();
+drawTwin();

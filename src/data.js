@@ -1,302 +1,309 @@
-export const scenarios = {
-  identity: {
-    code: "ID-07",
-    label: "Identity",
-    mapLabel: "Identity Abuse",
-    title: "Identity mesh breach rehearsal",
-    headline: "Guard the privilege chain",
-    summary: "Identity telemetry is stable, but privileged session depth needs a tighter verification loop.",
-    baseRisk: 48,
-    signal: 84,
-    assets: 1248,
-    mttr: 18,
-    nodes: [
-      { id: "Workforce", x: 0.17, y: 0.26, weight: 0.42 },
-      { id: "SSO", x: 0.38, y: 0.22, weight: 0.58 },
-      { id: "Privileged Access", x: 0.61, y: 0.34, weight: 0.76 },
-      { id: "Cloud Apps", x: 0.77, y: 0.56, weight: 0.51 },
-      { id: "Data Vault", x: 0.47, y: 0.69, weight: 0.64 },
-      { id: "Response", x: 0.24, y: 0.73, weight: 0.35 }
-    ],
-    links: [
-      ["Workforce", "SSO"],
-      ["SSO", "Privileged Access"],
-      ["Privileged Access", "Cloud Apps"],
-      ["Cloud Apps", "Data Vault"],
-      ["Data Vault", "Response"],
-      ["Response", "SSO"]
-    ],
-    incidents: [
-      ["High", "Impossible travel on privileged admin"],
-      ["Medium", "Session token lifetime exceeds baseline"],
-      ["Medium", "Dormant account touched sensitive app"],
-      ["Low", "New OAuth grant needs review"]
-    ],
-    playbook: [
-      "Force step-up verification for privileged roles",
-      "Expire risky sessions and rotate admin tokens",
-      "Review OAuth grants against business ownership",
-      "Snapshot access graph for after-action review"
-    ],
-    future: [42, 48, 52, 61, 68, 76, 82]
-  },
-  cloud: {
-    code: "CL-19",
-    label: "Cloud",
-    mapLabel: "Cloud Drift",
-    title: "Autonomous cloud guardrail drift",
-    headline: "Stabilize the control plane",
-    summary: "Policy drift is compressing response time across serverless, storage, and unmanaged workloads.",
-    baseRisk: 56,
-    signal: 78,
-    assets: 1892,
-    mttr: 24,
-    nodes: [
-      { id: "IaC", x: 0.15, y: 0.34, weight: 0.48 },
-      { id: "Control Plane", x: 0.39, y: 0.25, weight: 0.82 },
-      { id: "Serverless", x: 0.62, y: 0.24, weight: 0.68 },
-      { id: "Storage", x: 0.78, y: 0.54, weight: 0.72 },
-      { id: "Runtime", x: 0.49, y: 0.72, weight: 0.55 },
-      { id: "SOC", x: 0.24, y: 0.66, weight: 0.38 }
-    ],
-    links: [
-      ["IaC", "Control Plane"],
-      ["Control Plane", "Serverless"],
-      ["Serverless", "Storage"],
-      ["Storage", "Runtime"],
-      ["Runtime", "SOC"],
-      ["SOC", "Control Plane"]
-    ],
-    incidents: [
-      ["High", "Public storage policy drifted from template"],
-      ["High", "Serverless function gained broad secret scope"],
-      ["Medium", "Runtime image missing signed provenance"],
-      ["Low", "Unused region has active service principal"]
-    ],
-    playbook: [
-      "Reconcile drift against approved infrastructure state",
-      "Restrict secret scope for serverless workloads",
-      "Require signed images before production deploys",
-      "Disable inactive regions and service principals"
-    ],
-    future: [38, 47, 55, 60, 72, 79, 87]
-  },
-  supply: {
-    code: "SC-12",
-    label: "Supply",
-    mapLabel: "Supply Chain",
-    title: "Software supply-chain confidence net",
-    headline: "Verify every build handoff",
-    summary: "Build provenance is improving, while third-party package trust still needs continuous scoring.",
-    baseRisk: 52,
-    signal: 81,
-    assets: 764,
-    mttr: 31,
-    nodes: [
-      { id: "Source", x: 0.18, y: 0.49, weight: 0.36 },
-      { id: "Build", x: 0.39, y: 0.24, weight: 0.63 },
-      { id: "Packages", x: 0.66, y: 0.32, weight: 0.78 },
-      { id: "Registry", x: 0.79, y: 0.6, weight: 0.59 },
-      { id: "Runtime", x: 0.52, y: 0.72, weight: 0.5 },
-      { id: "Audit", x: 0.25, y: 0.74, weight: 0.31 }
-    ],
-    links: [
-      ["Source", "Build"],
-      ["Build", "Packages"],
-      ["Packages", "Registry"],
-      ["Registry", "Runtime"],
-      ["Runtime", "Audit"],
-      ["Audit", "Build"]
-    ],
-    incidents: [
-      ["High", "Package maintainer reputation dropped sharply"],
-      ["Medium", "Unsigned build artifact reached staging"],
-      ["Medium", "Dependency tree added transitive network library"],
-      ["Low", "SBOM freshness breached 14-day target"]
-    ],
-    playbook: [
-      "Pin dependency versions and verify package integrity",
-      "Block unsigned artifacts from deployment lanes",
-      "Regenerate SBOM and compare against previous release",
-      "Escalate owner review for reputation anomalies"
-    ],
-    future: [44, 51, 59, 65, 70, 77, 84]
-  },
-  ai: {
-    code: "AI-23",
-    label: "AI",
-    mapLabel: "AI Phishing",
-    title: "Synthetic social-engineering pressure test",
-    headline: "Harden human-in-the-loop approvals",
-    summary: "AI-generated lures are testing payment workflows, vendor changes, and executive impersonation paths.",
-    baseRisk: 61,
-    signal: 73,
-    assets: 936,
-    mttr: 27,
-    nodes: [
-      { id: "Inbox", x: 0.15, y: 0.29, weight: 0.66 },
-      { id: "Approvals", x: 0.38, y: 0.24, weight: 0.8 },
-      { id: "Finance", x: 0.63, y: 0.42, weight: 0.74 },
-      { id: "Vendors", x: 0.78, y: 0.66, weight: 0.56 },
-      { id: "Identity", x: 0.46, y: 0.72, weight: 0.69 },
-      { id: "Training", x: 0.22, y: 0.65, weight: 0.4 }
-    ],
-    links: [
-      ["Inbox", "Approvals"],
-      ["Approvals", "Finance"],
-      ["Finance", "Vendors"],
-      ["Vendors", "Identity"],
-      ["Identity", "Training"],
-      ["Training", "Inbox"]
-    ],
-    incidents: [
-      ["High", "Vendor-bank change request mimics CFO style"],
-      ["High", "Deepfake meeting request bypassed assistant queue"],
-      ["Medium", "Payment approval lacks second-channel proof"],
-      ["Low", "New external sender domain resembles partner"]
-    ],
-    playbook: [
-      "Require out-of-band verification for payment changes",
-      "Flag executive impersonation with adaptive banners",
-      "Tighten approval thresholds for vendor master data",
-      "Run targeted micro-training for exposed teams"
-    ],
-    future: [35, 43, 54, 60, 67, 74, 80]
-  },
-  agents: {
-    code: "AG-44",
-    label: "Agents",
-    mapLabel: "Agentic Workflows",
-    title: "Autonomous agent trust boundary",
-    headline: "Put policy between intent and action",
-    summary: "AI agents are multiplying access paths, so delegated permissions need strict scope, approvals, and durable audit trails.",
-    baseRisk: 59,
-    signal: 86,
-    assets: 1186,
-    mttr: 29,
-    nodes: [
-      { id: "Prompt Hub", x: 0.16, y: 0.32, weight: 0.6 },
-      { id: "Agent Runtime", x: 0.39, y: 0.22, weight: 0.82 },
-      { id: "Tool Gateway", x: 0.64, y: 0.34, weight: 0.76 },
-      { id: "SaaS APIs", x: 0.8, y: 0.6, weight: 0.58 },
-      { id: "Policy Engine", x: 0.49, y: 0.74, weight: 0.47 },
-      { id: "Audit Lake", x: 0.23, y: 0.68, weight: 0.38 }
-    ],
-    links: [
-      ["Prompt Hub", "Agent Runtime"],
-      ["Agent Runtime", "Tool Gateway"],
-      ["Tool Gateway", "SaaS APIs"],
-      ["SaaS APIs", "Policy Engine"],
-      ["Policy Engine", "Audit Lake"],
-      ["Audit Lake", "Agent Runtime"]
-    ],
-    incidents: [
-      ["High", "Agent requested broader tool scope than policy allows"],
-      ["Medium", "Delegated SaaS token lacks expiry guard"],
-      ["Medium", "Prompt library changed without approval evidence"],
-      ["Low", "Audit stream missed a tool invocation tag"]
-    ],
-    playbook: [
-      "Bind each agent action to a named policy decision",
-      "Require scoped, expiring tokens for tool calls",
-      "Route high-impact requests through human approval",
-      "Hash prompt and tool manifests into the audit trail"
-    ],
-    future: [36, 45, 56, 66, 73, 82, 91]
-  },
-  quantum: {
-    code: "QK-05",
-    label: "Quantum",
-    mapLabel: "Crypto Agility",
-    title: "Post-quantum readiness radar",
-    headline: "Map cryptography before urgency spikes",
-    summary: "Long-life data stores and unmanaged certificates need a migration path toward crypto-agile services.",
-    baseRisk: 44,
+export const missions = {
+  caremesh: {
+    code: "CM-32",
+    label: "Care Mesh",
+    sector: "Hospital Network",
+    title: "Care continuity twin for an autonomous hospital",
+    brief:
+      "Model patient identity, ward devices, clinical agents, and offline recovery as one living defensive system before disruption reaches care delivery.",
+    crownJewel: "Patient continuity ledger",
+    promise: "No patient loses care context when identity, devices, or network trust degrades.",
+    baseIntegrity: 68,
     signal: 88,
-    assets: 534,
-    mttr: 36,
+    assets: 2480,
+    continuity: 74,
     nodes: [
-      { id: "Certificates", x: 0.18, y: 0.26, weight: 0.69 },
-      { id: "Key Stores", x: 0.42, y: 0.22, weight: 0.58 },
-      { id: "Archives", x: 0.67, y: 0.35, weight: 0.77 },
-      { id: "APIs", x: 0.77, y: 0.61, weight: 0.49 },
-      { id: "Policies", x: 0.48, y: 0.73, weight: 0.42 },
-      { id: "Owners", x: 0.23, y: 0.66, weight: 0.33 }
+      { id: "patient-id", label: "Patient ID", x: 0.18, y: 0.28, type: "identity", weight: 0.64 },
+      { id: "clinical-agent", label: "Clinical Agent", x: 0.44, y: 0.22, type: "agent", weight: 0.77 },
+      { id: "ward-devices", label: "Ward Devices", x: 0.74, y: 0.34, type: "device", weight: 0.72 },
+      { id: "care-ledger", label: "Care Ledger", x: 0.58, y: 0.58, type: "crown", weight: 0.86 },
+      { id: "offline-pack", label: "Offline Pack", x: 0.28, y: 0.74, type: "recovery", weight: 0.48 },
+      { id: "family-portal", label: "Family Portal", x: 0.78, y: 0.76, type: "edge", weight: 0.38 }
     ],
     links: [
-      ["Certificates", "Key Stores"],
-      ["Key Stores", "Archives"],
-      ["Archives", "APIs"],
-      ["APIs", "Policies"],
-      ["Policies", "Owners"],
-      ["Owners", "Certificates"]
+      ["patient-id", "clinical-agent", "consent"],
+      ["clinical-agent", "ward-devices", "orders"],
+      ["ward-devices", "care-ledger", "telemetry"],
+      ["care-ledger", "offline-pack", "fallback"],
+      ["family-portal", "patient-id", "verification"],
+      ["clinical-agent", "care-ledger", "summary"]
     ],
-    incidents: [
-      ["Medium", "Certificate inventory has unknown owners"],
-      ["Medium", "Long-life archive lacks crypto classification"],
-      ["Low", "Legacy API does not support key agility marker"],
-      ["Low", "Rotation policy missing post-quantum milestone"]
+    timeline: [
+      ["00m", "Freeze high-impact agent actions and preserve patient context snapshots"],
+      ["07m", "Switch ward workflows to approved offline packets"],
+      ["18m", "Reconcile clinical orders against the continuity ledger"],
+      ["35m", "Release executive care-impact brief with evidence trail"]
     ],
-    playbook: [
-      "Classify data by confidentiality lifetime",
-      "Assign owners to unmanaged certificates",
-      "Add crypto-agility markers to API inventory",
-      "Stage migration plan for high-value archives"
+    signals: [
+      "Two ward devices reported trust drift outside normal maintenance windows",
+      "Clinical agent requested a medication-summary action without fresh consent proof",
+      "Offline packet freshness is inside tolerance but near the review line"
     ],
-    future: [50, 54, 61, 68, 76, 83, 90]
+    policies: [
+      "Agent-written care summaries require consent proof and clinician attestation",
+      "Ward devices fall back to local order queues when identity confidence drops",
+      "Family-portal sessions cannot alter care context without second-channel verification"
+    ],
+    evidence: ["Consent receipt", "Device attestation", "Offline packet hash", "Care-impact owner"],
+    future: [62, 66, 70, 73, 76, 82, 86]
   },
-  ransomware: {
-    code: "RW-31",
-    label: "Recovery",
-    mapLabel: "Recovery Mesh",
-    title: "Ransomware resilience tabletop",
-    headline: "Protect the restore path",
-    summary: "Backup confidence is strong, while identity blast radius and recovery sequencing still shape downtime.",
-    baseRisk: 58,
-    signal: 79,
-    assets: 1430,
-    mttr: 42,
+  port: {
+    code: "AP-29",
+    label: "Auto Port",
+    sector: "Logistics",
+    title: "Autonomous port trust choreography",
+    brief:
+      "Stress-test cargo robotics, customs data, supplier messages, and manual fallback lanes as one coordinated resilience story.",
+    crownJewel: "Berth scheduling authority",
+    promise: "Cargo keeps moving safely even when automation confidence becomes uneven.",
+    baseIntegrity: 61,
+    signal: 82,
+    assets: 3910,
+    continuity: 67,
     nodes: [
-      { id: "Endpoints", x: 0.16, y: 0.35, weight: 0.7 },
-      { id: "Identity", x: 0.38, y: 0.25, weight: 0.66 },
-      { id: "File Shares", x: 0.63, y: 0.32, weight: 0.78 },
-      { id: "Backups", x: 0.8, y: 0.57, weight: 0.45 },
-      { id: "Restore", x: 0.5, y: 0.74, weight: 0.52 },
-      { id: "Comms", x: 0.24, y: 0.69, weight: 0.36 }
+      { id: "berth-ai", label: "Berth AI", x: 0.2, y: 0.24, type: "agent", weight: 0.76 },
+      { id: "cargo-robots", label: "Cargo Robots", x: 0.48, y: 0.19, type: "device", weight: 0.82 },
+      { id: "customs-feed", label: "Customs Feed", x: 0.78, y: 0.32, type: "data", weight: 0.58 },
+      { id: "schedule-core", label: "Schedule Core", x: 0.58, y: 0.58, type: "crown", weight: 0.88 },
+      { id: "manual-lane", label: "Manual Lane", x: 0.31, y: 0.76, type: "recovery", weight: 0.52 },
+      { id: "supplier-mesh", label: "Supplier Mesh", x: 0.79, y: 0.76, type: "edge", weight: 0.7 }
     ],
     links: [
-      ["Endpoints", "Identity"],
-      ["Identity", "File Shares"],
-      ["File Shares", "Backups"],
-      ["Backups", "Restore"],
-      ["Restore", "Comms"],
-      ["Comms", "Identity"]
+      ["berth-ai", "cargo-robots", "dispatch"],
+      ["cargo-robots", "customs-feed", "status"],
+      ["customs-feed", "schedule-core", "release"],
+      ["schedule-core", "manual-lane", "fallback"],
+      ["supplier-mesh", "customs-feed", "manifest"],
+      ["berth-ai", "schedule-core", "decision"]
     ],
-    incidents: [
-      ["High", "Endpoint cluster exceeded encryption-like write pattern"],
-      ["High", "Shared admin credential touched file services"],
-      ["Medium", "Restore priority list missing business owner"],
-      ["Low", "Crisis comms channel needs contact refresh"]
+    timeline: [
+      ["00m", "Pin berth automation to advisory-only mode"],
+      ["09m", "Require customs-feed provenance before cargo release"],
+      ["21m", "Move high-value containers through the manual lane"],
+      ["40m", "Publish dwell-time impact and recovery confidence"]
     ],
-    playbook: [
-      "Isolate affected endpoint cluster",
-      "Disable shared admin credential and rotate secrets",
-      "Verify restore order with business impact owners",
-      "Send crisis comms packet to response channel"
+    signals: [
+      "Supplier manifest cadence shifted from historical rhythm",
+      "Robot dispatch confidence dropped near a high-value cargo lane",
+      "Manual lane capacity is available but under-tested this quarter"
     ],
-    future: [37, 42, 50, 62, 71, 81, 89]
+    policies: [
+      "Berth changes above impact threshold require human dispatcher approval",
+      "Cargo robots reject jobs without signed route and cargo context",
+      "Supplier messages must carry provenance before scheduling authority consumes them"
+    ],
+    evidence: ["Route signature", "Manifest provenance", "Dispatcher approval", "Manual-lane drill"],
+    future: [52, 58, 64, 68, 73, 79, 84]
+  },
+  treasury: {
+    code: "PT-41",
+    label: "Treasury",
+    sector: "Financial Services",
+    title: "Programmable treasury approval fabric",
+    brief:
+      "Rehearse payment-agent authority, vendor trust, liquidity telemetry, and board-level decision gates without exposing financial data.",
+    crownJewel: "Payment release authority",
+    promise: "Money movement remains explainable, reversible, and owner-approved under pressure.",
+    baseIntegrity: 72,
+    signal: 91,
+    assets: 1840,
+    continuity: 81,
+    nodes: [
+      { id: "vendor-id", label: "Vendor ID", x: 0.18, y: 0.3, type: "identity", weight: 0.61 },
+      { id: "payment-agent", label: "Payment Agent", x: 0.44, y: 0.2, type: "agent", weight: 0.83 },
+      { id: "bank-rails", label: "Bank Rails", x: 0.76, y: 0.31, type: "edge", weight: 0.73 },
+      { id: "release-core", label: "Release Core", x: 0.56, y: 0.57, type: "crown", weight: 0.9 },
+      { id: "board-gate", label: "Board Gate", x: 0.28, y: 0.75, type: "policy", weight: 0.54 },
+      { id: "liquidity-feed", label: "Liquidity Feed", x: 0.78, y: 0.74, type: "data", weight: 0.49 }
+    ],
+    links: [
+      ["vendor-id", "payment-agent", "request"],
+      ["payment-agent", "bank-rails", "instruction"],
+      ["bank-rails", "release-core", "settlement"],
+      ["release-core", "board-gate", "exception"],
+      ["liquidity-feed", "release-core", "limits"],
+      ["board-gate", "payment-agent", "approval"]
+    ],
+    timeline: [
+      ["00m", "Move payment agent to draft-only output"],
+      ["06m", "Require owner proof for vendor master-data changes"],
+      ["16m", "Compare release queue against liquidity and fraud thresholds"],
+      ["28m", "Send reversible-payment decision packet to executives"]
+    ],
+    signals: [
+      "Vendor-bank change cadence is higher than normal for this business unit",
+      "Payment agent confidence is high but approval evidence is incomplete",
+      "Liquidity limit model disagrees with a release-batch priority"
+    ],
+    policies: [
+      "Payment agents can draft but cannot release funds without owner proof",
+      "Vendor master-data changes require out-of-band verification",
+      "Release batches above threshold must include rollback and contact evidence"
+    ],
+    evidence: ["Owner proof", "Vendor change log", "Liquidity threshold", "Rollback contact"],
+    future: [68, 71, 74, 77, 82, 86, 91]
+  },
+  research: {
+    code: "RF-18",
+    label: "Research",
+    sector: "AI Lab",
+    title: "Frontier research fabric with controlled autonomy",
+    brief:
+      "Balance model-training velocity, secret boundaries, dataset lineage, and agent tooling so research can move quickly without losing governance.",
+    crownJewel: "Research lineage vault",
+    promise: "Experimental systems stay fast, attributable, and contained.",
+    baseIntegrity: 64,
+    signal: 85,
+    assets: 1320,
+    continuity: 70,
+    nodes: [
+      { id: "dataset-vault", label: "Dataset Vault", x: 0.17, y: 0.28, type: "data", weight: 0.74 },
+      { id: "lab-agents", label: "Lab Agents", x: 0.42, y: 0.2, type: "agent", weight: 0.86 },
+      { id: "training-fleet", label: "Training Fleet", x: 0.74, y: 0.32, type: "device", weight: 0.7 },
+      { id: "lineage-core", label: "Lineage Core", x: 0.56, y: 0.58, type: "crown", weight: 0.89 },
+      { id: "review-council", label: "Review Council", x: 0.28, y: 0.76, type: "policy", weight: 0.58 },
+      { id: "partner-api", label: "Partner API", x: 0.8, y: 0.76, type: "edge", weight: 0.46 }
+    ],
+    links: [
+      ["dataset-vault", "lab-agents", "context"],
+      ["lab-agents", "training-fleet", "jobs"],
+      ["training-fleet", "lineage-core", "artifacts"],
+      ["lineage-core", "review-council", "review"],
+      ["partner-api", "dataset-vault", "exchange"],
+      ["review-council", "lab-agents", "scope"]
+    ],
+    timeline: [
+      ["00m", "Freeze new partner-data imports until lineage is proven"],
+      ["10m", "Constrain lab agents to approved tool manifests"],
+      ["24m", "Compare training artifacts against lineage and review policy"],
+      ["42m", "Deliver research-continuity memo to program owners"]
+    ],
+    signals: [
+      "A partner API added fields not present in the approved data contract",
+      "Tool-manifest drift appeared in one research agent workspace",
+      "Lineage coverage is strong but review-council latency is increasing"
+    ],
+    policies: [
+      "Research agents receive scoped, expiring tool grants per experiment",
+      "Training artifacts must cite dataset lineage before sharing",
+      "Partner data contracts block unknown fields until reviewed"
+    ],
+    evidence: ["Tool manifest", "Dataset lineage", "Review decision", "Partner contract"],
+    future: [57, 63, 68, 72, 76, 81, 88]
+  },
+  citygrid: {
+    code: "CG-26",
+    label: "City Grid",
+    sector: "Public Infrastructure",
+    title: "Civic sensor grid resilience commons",
+    brief:
+      "Coordinate street sensors, public dashboards, operator consoles, and privacy rules into a civic-grade defensive operating model.",
+    crownJewel: "Public operations picture",
+    promise: "The city keeps seeing clearly without exposing people unnecessarily.",
+    baseIntegrity: 59,
+    signal: 79,
+    assets: 5220,
+    continuity: 66,
+    nodes: [
+      { id: "street-sensors", label: "Street Sensors", x: 0.19, y: 0.27, type: "device", weight: 0.69 },
+      { id: "ops-agent", label: "Ops Agent", x: 0.45, y: 0.2, type: "agent", weight: 0.72 },
+      { id: "public-map", label: "Public Map", x: 0.78, y: 0.34, type: "edge", weight: 0.64 },
+      { id: "ops-picture", label: "Ops Picture", x: 0.57, y: 0.58, type: "crown", weight: 0.87 },
+      { id: "privacy-board", label: "Privacy Board", x: 0.28, y: 0.75, type: "policy", weight: 0.61 },
+      { id: "field-teams", label: "Field Teams", x: 0.79, y: 0.75, type: "recovery", weight: 0.44 }
+    ],
+    links: [
+      ["street-sensors", "ops-agent", "signals"],
+      ["ops-agent", "public-map", "updates"],
+      ["public-map", "ops-picture", "feedback"],
+      ["ops-picture", "privacy-board", "privacy"],
+      ["field-teams", "street-sensors", "repair"],
+      ["privacy-board", "ops-agent", "rules"]
+    ],
+    timeline: [
+      ["00m", "Disable public-map auto-publish for sensitive districts"],
+      ["08m", "Prioritize field teams by safety and sensor confidence"],
+      ["19m", "Apply privacy board rules to the operations picture"],
+      ["36m", "Issue public-status update with uncertainty labels"]
+    ],
+    signals: [
+      "One district sensor cluster is noisier than normal after maintenance",
+      "Public dashboard demand is rising faster than verification capacity",
+      "Privacy-rule coverage is strong but district labels need review"
+    ],
+    policies: [
+      "Public updates include confidence and privacy labels before publishing",
+      "Sensor clusters require maintenance proof before informing decisions",
+      "Ops agents cannot expose sensitive district views without board rules"
+    ],
+    evidence: ["Sensor maintenance proof", "Privacy rule", "Public update log", "Field-team route"],
+    future: [51, 56, 62, 67, 72, 76, 83]
+  },
+  orbital: {
+    code: "OL-50",
+    label: "Orbital",
+    sector: "Space Logistics",
+    title: "Orbital logistics command assurance",
+    brief:
+      "Explore how ground stations, mission planners, supplier telemetry, and delayed communications stay trustworthy when timing is unforgiving.",
+    crownJewel: "Mission command window",
+    promise: "Every command is deliberate, attributable, and recoverable before the window closes.",
+    baseIntegrity: 66,
+    signal: 87,
+    assets: 890,
+    continuity: 72,
+    nodes: [
+      { id: "ground-id", label: "Ground ID", x: 0.17, y: 0.29, type: "identity", weight: 0.62 },
+      { id: "mission-agent", label: "Mission Agent", x: 0.42, y: 0.19, type: "agent", weight: 0.8 },
+      { id: "station-link", label: "Station Link", x: 0.75, y: 0.32, type: "edge", weight: 0.76 },
+      { id: "command-core", label: "Command Core", x: 0.57, y: 0.57, type: "crown", weight: 0.91 },
+      { id: "delay-plan", label: "Delay Plan", x: 0.29, y: 0.76, type: "recovery", weight: 0.53 },
+      { id: "supplier-telemetry", label: "Supplier Telemetry", x: 0.8, y: 0.75, type: "data", weight: 0.57 }
+    ],
+    links: [
+      ["ground-id", "mission-agent", "authorization"],
+      ["mission-agent", "station-link", "proposal"],
+      ["station-link", "command-core", "command"],
+      ["command-core", "delay-plan", "fallback"],
+      ["supplier-telemetry", "station-link", "health"],
+      ["delay-plan", "mission-agent", "constraints"]
+    ],
+    timeline: [
+      ["00m", "Lock command window to pre-approved objective set"],
+      ["05m", "Confirm station-link health against supplier telemetry"],
+      ["14m", "Stage delayed fallback plan and owner confirmations"],
+      ["26m", "Archive command evidence before next orbital pass"]
+    ],
+    signals: [
+      "Supplier telemetry arrived late but inside confidence threshold",
+      "Mission agent proposed a command outside the pre-approved objective set",
+      "Delay plan is complete but owner confirmation is stale"
+    ],
+    policies: [
+      "Mission-agent proposals cannot exceed the objective set for the pass",
+      "Station commands require fresh identity and link-health proof",
+      "Delayed fallback plans must include owner confirmation and expiry"
+    ],
+    evidence: ["Objective set", "Link-health proof", "Owner confirmation", "Command archive"],
+    future: [60, 65, 69, 74, 78, 84, 90]
   }
 };
 
 export const controlWeights = {
-  mfa: 10,
-  edr: 9,
-  backups: 8,
-  secrets: 7
+  approvals: 12,
+  recovery: 11,
+  attestation: 9,
+  privacy: 8
 };
 
-export const modeProfiles = {
-  monitor: { label: "Monitor", riskShift: 0, containment: 1 },
-  harden: { label: "Harden", riskShift: -8, containment: 0.86 },
-  contain: { label: "Contain", riskShift: -13, containment: 0.68 }
+export const lenses = {
+  board: { label: "Board", integrityShift: 2, loadShift: -4, caption: "Decision packet" },
+  soc: { label: "SOC", integrityShift: 0, loadShift: 6, caption: "Operator drill" },
+  legal: { label: "Trust", integrityShift: -1, loadShift: 2, caption: "Evidence review" }
+};
+
+export const horizonProfiles = {
+  30: { label: "30d", drift: -3, maturity: 0.92, caption: "Immediate operational confidence" },
+  90: { label: "90d", drift: 2, maturity: 1, caption: "Quarterly resilience posture" },
+  180: { label: "180d", drift: 8, maturity: 1.12, caption: "Long-range governance pressure" }
 };

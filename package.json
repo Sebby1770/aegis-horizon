@@ -1,7 +1,7 @@
 {
   "name": "aegis-horizon",
   "version": "1.0.0",
-  "description": "A futuristic defensive cybersecurity command center for blue-team planning and resilience forecasting.",
+  "description": "A local-first cyber resilience twin studio for future defensive systems and policy rehearsal.",
   "type": "module",
   "scripts": {
     "start": "python3 -m http.server 4173",
@@ -10,9 +10,11 @@
   "keywords": [
     "cybersecurity",
     "blue-team",
-    "risk",
+    "resilience",
+    "digital-twin",
+    "tabletop",
     "zero-trust",
-    "dashboard",
+    "policy",
     "incident-response"
   ],
   "author": "Sebby1770",

@@ -1,18 +1,17 @@
 # Aegis Horizon
 
-Aegis Horizon is a future-facing cybersecurity command center for blue-team planning, executive briefings, and portfolio demos. It turns defensive posture inputs into an animated risk forecast, incident queue, attack-surface map, future horizon model, and mitigation plan without sending data anywhere.
+Aegis Horizon is a local-first cyber resilience twin studio for future defensive systems, tabletop rehearsals, and executive policy packets. Instead of acting like another SOC dashboard, it lets teams model a future system, tune autonomy and supplier pressure, watch trust paths move across a live canvas, and compile defensive rules with evidence.
 
 The project is intentionally defensive. It contains no exploit code, credential harvesting logic, malware samples, scanner modules, or instructions for unauthorized access.
 
 ## What it does
 
-- Models modern cyber scenarios such as identity abuse, cloud drift, supply-chain exposure, AI phishing, quantum readiness, and ransomware pressure.
-- Includes an agentic-workflow scenario for the next wave of autonomous tool access and policy enforcement.
-- Scores cyber risk from local controls including MFA, EDR health, backup readiness, secrets rotation, exposure, drift, and data sensitivity.
-- Projects 30-, 90-, and 180-day defensive maturity so teams can compare immediate containment with long-range resilience.
-- Renders an animated attack-surface graph with scenario-specific nodes, paths, and signal intensity.
-- Produces a local incident-response brief that can be downloaded as JSON with a browser-generated SHA-256 integrity digest when WebCrypto is available.
-- Saves and restores one posture profile in local storage, keeping all data inside the browser.
+- Models six distinctive future systems: autonomous hospital care, autonomous ports, programmable treasury, frontier research, civic sensor grids, and orbital logistics.
+- Draws an animated resilience twin with crown jewels, agents, recovery lanes, policy gates, trust paths, and moving evidence signals.
+- Tunes decision lens, 30/90/180-day horizon, agent authority, supplier coupling, data gravity, and four defensive safeguards.
+- Generates a tabletop timeline, policy forge rules, futures signals, and evidence ledger from the current local model.
+- Produces a local policy packet as JSON with a browser-generated SHA-256 integrity digest when WebCrypto is available.
+- Saves and restores one twin profile in local storage, keeping all data inside the browser.
 - Ships as a static site suitable for GitHub Pages or any static host.
 
 ## Run locally
@@ -35,7 +34,7 @@ No install step is required because the app has no runtime dependencies.
 npm test
 ```
 
-The validation script checks that the static app files exist, the scenario catalog is present, and the HTML references local assets only.
+The validation script checks that the static app files exist, the mission catalog is present, and the HTML references local assets only.
 
 ## Publish on GitHub Pages
 
@@ -59,10 +58,10 @@ In the repository settings, set Pages to deploy from the `main` branch and the r
 
 ## Roadmap
 
-- Add CSV import for asset inventories.
-- Add MITRE ATT&CK-inspired defensive technique mapping.
+- Add import/export for named twin portfolios.
+- Add defensive technique mapping for each generated policy.
 - Add printable board-level risk reports.
-- Add optional WebCrypto signing for exported briefs.
+- Add optional WebCrypto signing for exported policy packets.
 - Add multiple named local profiles and comparison snapshots.
 
 ## Safety boundary
