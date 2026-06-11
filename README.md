@@ -11,7 +11,7 @@ The project is intentionally defensive. It contains no exploit code, credential 
 - Tunes decision lens, 30/90/180-day horizon, agent authority, supplier coupling, data gravity, and four defensive safeguards.
 - Generates a tabletop timeline, policy forge rules, futures signals, and evidence ledger from the current local model.
 - Produces a local policy packet as JSON with a browser-generated SHA-256 integrity digest when WebCrypto is available.
-- Saves and restores one twin profile in local storage, keeping all data inside the browser.
+- Saves, validates, and restores one twin profile in local storage, keeping all data inside the browser.
 - Ships as a static site suitable for GitHub Pages or any static host.
 
 ## Run locally
@@ -35,6 +35,7 @@ npm test
 ```
 
 The validation script checks that the static app files exist, the mission catalog is present, and the HTML references local assets only.
+It also exercises local profile normalization so corrupted saved values are rejected or clamped before they reach the UI.
 
 ## Publish on GitHub Pages
 
@@ -50,6 +51,7 @@ In the repository settings, set Pages to deploy from the `main` branch and the r
 ├── src/
 │   ├── app.js
 │   ├── data.js
+│   ├── profile.js
 │   └── styles.css
 ├── tools/
 │   └── validate.mjs

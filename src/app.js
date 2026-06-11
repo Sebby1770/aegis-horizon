@@ -1,6 +1,5 @@
 import { controlWeights, horizonProfiles, lenses, missions } from "./data.js";
-
-const profileStorageKey = "aegis-horizon-twin-profile";
+import { normalizeProfile, profileStorageKey } from "./profile.js";
 
 const state = {
   mission: "caremesh",
@@ -640,26 +639,21 @@ function loadProfile() {
       return;
     }
 
-    const profile = JSON.parse(stored);
-    if (!missions[profile.mission] || !lenses[profile.lens] || !horizonProfiles[profile.horizon]) {
+    const profile = normalizeProfile(JSON.parse(stored), state, {
+      missions,
+      lenses,
+      horizons: horizonProfiles
+    });
+    if (!profile) {
       markProfileState("Invalid");
       return;
     }
 
     state.mission = profile.mission;
     state.lens = profile.lens;
-    state.horizon = Number(profile.horizon);
-    state.pressure = {
-      agent: clamp(Number(profile.pressure?.agent ?? state.pressure.agent), 0, 100),
-      supplier: clamp(Number(profile.pressure?.supplier ?? state.pressure.supplier), 0, 100),
-      data: clamp(Number(profile.pressure?.data ?? state.pressure.data), 0, 100)
-    };
-    state.controls = {
-      approvals: Boolean(profile.controls?.approvals),
-      recovery: Boolean(profile.controls?.recovery),
-      attestation: Boolean(profile.controls?.attestation),
-      privacy: Boolean(profile.controls?.privacy)
-    };
+    state.horizon = profile.horizon;
+    state.pressure = profile.pressure;
+    state.controls = profile.controls;
 
     updateControlsFromState();
     renderDashboard();

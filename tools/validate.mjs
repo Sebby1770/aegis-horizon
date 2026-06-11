@@ -1,9 +1,14 @@
 import { readFile } from "node:fs/promises";
+import strictAssert from "node:assert/strict";
+
+import { horizonProfiles, lenses, missions } from "../src/data.js";
+import { normalizeProfile } from "../src/profile.js";
 
 const requiredFiles = [
   "index.html",
   "src/app.js",
   "src/data.js",
+  "src/profile.js",
   "src/styles.css",
   "assets/aegis-mark.svg",
   "README.md",
@@ -14,6 +19,45 @@ async function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
   }
+}
+
+function validateProfileNormalization() {
+  const currentState = {
+    pressure: {
+      agent: 52,
+      supplier: 44,
+      data: 61
+    }
+  };
+  const catalogs = { missions, lenses, horizons: horizonProfiles };
+
+  const safe = normalizeProfile(
+    {
+      mission: "caremesh",
+      lens: "board",
+      horizon: "90",
+      pressure: {
+        agent: "999",
+        supplier: "not-a-number",
+        data: "-12"
+      },
+      controls: {
+        approvals: 1,
+        recovery: 0,
+        attestation: true,
+        privacy: false
+      }
+    },
+    currentState,
+    catalogs
+  );
+
+  strictAssert.equal(safe.pressure.agent, 100);
+  strictAssert.equal(safe.pressure.supplier, 44);
+  strictAssert.equal(safe.pressure.data, 0);
+  strictAssert.equal(safe.controls.approvals, true);
+  strictAssert.equal(safe.controls.recovery, false);
+  strictAssert.equal(normalizeProfile({ mission: "unknown" }, currentState, catalogs), null);
 }
 
 async function main() {
@@ -32,6 +76,7 @@ async function main() {
   const combined = scannedPaths.map((path) => byPath[path]).join("\n").toLowerCase();
   const unsafeHit = unsafeTerms.find((term) => combined.includes(term));
   await assert(!unsafeHit, `unsafe offensive term found: ${unsafeHit}`);
+  validateProfileNormalization();
 
   console.log(`Validated ${requiredFiles.length} files and ${scenarioMatches.length} scenarios.`);
 }
