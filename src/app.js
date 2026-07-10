@@ -1,6 +1,18 @@
 import { controlWeights, horizonProfiles, lenses, missions } from "./data.js";
+import {
+  techniqueCatalog,
+  techniquesForPolicy,
+  techniqueCoverage
+} from "./techniques.js";
 
-const profileStorageKey = "aegis-horizon-twin-profile";
+/** Legacy single-profile key (migrated on first load). */
+const legacyProfileKey = "aegis-horizon-twin-profile";
+/** Named multi-profile portfolio. */
+const portfolioStorageKey = "aegis-horizon-portfolio-v1";
+/** Comparison snapshots store. */
+const snapshotsStorageKey = "aegis-horizon-snapshots-v1";
+
+const DEFAULT_PROFILE_NAME = "Default";
 
 const state = {
   mission: "caremesh",
@@ -17,9 +29,17 @@ const state = {
     attestation: false,
     privacy: true
   },
+  activeProfileName: DEFAULT_PROFILE_NAME,
   pulse: 0,
-  frameTime: 0
+  frameTime: 0,
+  lastPacketDigest: null
 };
+
+/** In-memory portfolio: { [name]: profilePayload } */
+let portfolio = {};
+
+/** In-memory snapshots: Array<{ id, name, capturedAt, ...metrics }> */
+let snapshots = [];
 
 const els = {
   missionButtons: document.querySelector("#missionButtons"),
@@ -57,13 +77,44 @@ const els = {
   evidenceCount: document.querySelector("#evidenceCount"),
   evidenceList: document.querySelector("#evidenceList"),
   profileState: document.querySelector("#profileState"),
+  profileNameInput: document.querySelector("#profileNameInput"),
+  profileList: document.querySelector("#profileList"),
   agentRange: document.querySelector("#agentRange"),
   supplierRange: document.querySelector("#supplierRange"),
   dataRange: document.querySelector("#dataRange"),
   rehearseButton: document.querySelector("#rehearseButton"),
   exportButton: document.querySelector("#exportButton"),
+  printReportButton: document.querySelector("#printReportButton"),
   saveProfileButton: document.querySelector("#saveProfileButton"),
-  loadProfileButton: document.querySelector("#loadProfileButton")
+  saveAsProfileButton: document.querySelector("#saveAsProfileButton"),
+  exportPortfolioButton: document.querySelector("#exportPortfolioButton"),
+  importPortfolioButton: document.querySelector("#importPortfolioButton"),
+  importPortfolioInput: document.querySelector("#importPortfolioInput"),
+  snapshotNameInput: document.querySelector("#snapshotNameInput"),
+  captureSnapshotButton: document.querySelector("#captureSnapshotButton"),
+  compareSnapshotsButton: document.querySelector("#compareSnapshotsButton"),
+  snapshotList: document.querySelector("#snapshotList"),
+  snapshotCount: document.querySelector("#snapshotCount"),
+  compareModal: document.querySelector("#compareModal"),
+  closeCompareModal: document.querySelector("#closeCompareModal"),
+  compareSelectA: document.querySelector("#compareSelectA"),
+  compareSelectB: document.querySelector("#compareSelectB"),
+  compareResults: document.querySelector("#compareResults"),
+  printReport: document.querySelector("#printReport"),
+  printMissionTitle: document.querySelector("#printMissionTitle"),
+  printMissionMeta: document.querySelector("#printMissionMeta"),
+  printIntegrity: document.querySelector("#printIntegrity"),
+  printContinuity: document.querySelector("#printContinuity"),
+  printSafeguards: document.querySelector("#printSafeguards"),
+  printDecisionLoad: document.querySelector("#printDecisionLoad"),
+  printDecisionSummary: document.querySelector("#printDecisionSummary"),
+  printPressureSummary: document.querySelector("#printPressureSummary"),
+  printPolicyList: document.querySelector("#printPolicyList"),
+  printTechniqueList: document.querySelector("#printTechniqueList"),
+  printTimelineList: document.querySelector("#printTimelineList"),
+  printEvidenceList: document.querySelector("#printEvidenceList"),
+  printGeneratedAt: document.querySelector("#printGeneratedAt"),
+  printDigest: document.querySelector("#printDigest")
 };
 
 const twinCtx = els.twinCanvas.getContext("2d");
@@ -116,8 +167,8 @@ function pressureScore() {
 }
 
 function coverage() {
-  const enabled = Object.entries(state.controls).reduce((total, [key, enabled]) => {
-    return total + (enabled ? controlWeights[key] : 0);
+  const enabled = Object.entries(state.controls).reduce((total, [key, enabledFlag]) => {
+    return total + (enabledFlag ? controlWeights[key] : 0);
   }, 0);
   const total = Object.values(controlWeights).reduce((sum, value) => sum + value, 0);
   return Math.round((enabled / total) * 100);
@@ -131,7 +182,15 @@ function integrityScore() {
   const recoveryLift = state.controls.recovery ? 4 : -4;
   const attestationLift = state.controls.attestation ? 4 : -3;
   return clamp(
-    Math.round(active.baseIntegrity + safeguardLift - pressurePenalty - horizon().drift + lens().integrityShift + recoveryLift + attestationLift),
+    Math.round(
+      active.baseIntegrity +
+        safeguardLift -
+        pressurePenalty -
+        horizon().drift +
+        lens().integrityShift +
+        recoveryLift +
+        attestationLift
+    ),
     12,
     98
   );
@@ -141,12 +200,22 @@ function continuityScore() {
   const active = mission();
   const recoveryLift = state.controls.recovery ? 10 : -8;
   const privacyLift = state.controls.privacy ? 3 : -4;
-  return clamp(Math.round(active.continuity + coverage() * 0.16 - pressureScore() * 0.13 - horizon().drift + recoveryLift + privacyLift), 8, 98);
+  return clamp(
+    Math.round(
+      active.continuity + coverage() * 0.16 - pressureScore() * 0.13 - horizon().drift + recoveryLift + privacyLift
+    ),
+    8,
+    98
+  );
 }
 
 function decisionLoad() {
   const horizonLoad = state.horizon === 180 ? 10 : state.horizon === 30 ? -2 : 4;
-  return clamp(Math.round(12 + pressureScore() * 0.34 + mission().nodes.length + lens().loadShift + horizonLoad - coverage() * 0.09), 4, 72);
+  return clamp(
+    Math.round(12 + pressureScore() * 0.34 + mission().nodes.length + lens().loadShift + horizonLoad - coverage() * 0.09),
+    4,
+    72
+  );
 }
 
 function evidenceReady() {
@@ -164,13 +233,6 @@ function recoveryWindow() {
   return clamp(baseline + delay - (state.controls.recovery ? 5 : 0), 12, 96);
 }
 
-function band(score) {
-  if (score >= 82) return "Resilient";
-  if (score >= 66) return "Ready";
-  if (score >= 48) return "Tense";
-  return "Fragile";
-}
-
 function decisionHeadline(score) {
   if (score >= 82) return "Resilient by design";
   if (score >= 66) return "Continuity-first posture";
@@ -186,10 +248,6 @@ function decisionSummary(score) {
   return `${active.crownJewel} should not absorb more autonomy until missing safeguards are restored.`;
 }
 
-function formatNumber(value) {
-  return new Intl.NumberFormat("en").format(value);
-}
-
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (char) => {
     return {
@@ -200,6 +258,14 @@ function escapeHtml(value) {
       "'": "&#39;"
     }[char];
   });
+}
+
+function sanitizeName(raw, fallback = DEFAULT_PROFILE_NAME) {
+  const cleaned = String(raw ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, 48);
+  return cleaned || fallback;
 }
 
 function setPressed(buttons, activeValue, dataName) {
@@ -226,30 +292,82 @@ function renderMissionButtons() {
     .join("");
 }
 
-function generatedPolicies(score) {
+/**
+ * Build policy rules with defensive technique tags.
+ * @returns {Array<{ rule: string, techniques: string[], source: "generated"|"mission" }>}
+ */
+function buildPolicyRows(score) {
   const active = mission();
-  const policies = [];
+  const generated = [];
 
-  if (!state.controls.approvals) policies.push(`IF ${active.crownJewel} changes THEN require named owner approval before action.`);
-  if (!state.controls.recovery) policies.push("IF continuity confidence drops THEN activate an offline recovery owner before automation proceeds.");
-  if (!state.controls.attestation) policies.push("IF a system writes to a crown-jewel path THEN attach signed evidence to the decision record.");
-  if (!state.controls.privacy) policies.push("IF people or sensitive context appears THEN enforce a privacy boundary before publishing.");
-  if (state.pressure.agent > 64) policies.push("IF agent authority rises above threshold THEN convert high-impact actions to draft-only mode.");
-  if (state.pressure.supplier > 64) policies.push("IF supplier coupling rises THEN require provenance before system-to-system trust.");
-  if (score < 55) policies.push("IF integrity is tense THEN pause new autonomy until safeguards are restored.");
+  if (!state.controls.approvals) {
+    generated.push(`IF ${active.crownJewel} changes THEN require named owner approval before action.`);
+  }
+  if (!state.controls.recovery) {
+    generated.push("IF continuity confidence drops THEN activate an offline recovery owner before automation proceeds.");
+  }
+  if (!state.controls.attestation) {
+    generated.push("IF a system writes to a crown-jewel path THEN attach signed evidence to the decision record.");
+  }
+  if (!state.controls.privacy) {
+    generated.push("IF people or sensitive context appears THEN enforce a privacy boundary before publishing.");
+  }
+  if (state.pressure.agent > 64) {
+    generated.push("IF agent authority rises above threshold THEN convert high-impact actions to draft-only mode.");
+  }
+  if (state.pressure.supplier > 64) {
+    generated.push("IF supplier coupling rises THEN require provenance before system-to-system trust.");
+  }
+  if (score < 55) {
+    generated.push("IF integrity is tense THEN pause new autonomy until safeguards are restored.");
+  }
 
-  return [...policies, ...active.policies].slice(0, 5);
+  const rows = [];
+
+  generated.forEach((rule) => {
+    rows.push({
+      rule,
+      techniques: techniquesForPolicy(rule, state.mission),
+      source: "generated"
+    });
+  });
+
+  active.policies.forEach((rule, index) => {
+    rows.push({
+      rule,
+      techniques: techniquesForPolicy(rule, state.mission, index),
+      source: "mission"
+    });
+  });
+
+  return rows.slice(0, 5);
+}
+
+function generatedPolicies(score) {
+  return buildPolicyRows(score).map((row) => row.rule);
+}
+
+function renderTechniqueChips(techniqueIds) {
+  return techniqueIds
+    .map((id) => {
+      const label = techniqueCatalog[id]?.label ?? id;
+      return `<span class="technique-chip" title="${escapeHtml(techniqueCatalog[id]?.blurb ?? label)}">${escapeHtml(label)}</span>`;
+    })
+    .join("");
 }
 
 function renderPolicy(score) {
-  const rules = generatedPolicies(score);
+  const rows = buildPolicyRows(score);
   els.policyState.textContent = score >= 66 ? "Compiled" : "Repair";
-  els.policyList.innerHTML = rules
-    .map((rule, index) => {
+  els.policyList.innerHTML = rows
+    .map((row, index) => {
       return `
         <article class="policy-row">
           <span>${String(index + 1).padStart(2, "0")}</span>
-          <p>${escapeHtml(rule)}</p>
+          <div class="policy-body">
+            <p>${escapeHtml(row.rule)}</p>
+            <div class="technique-chips" aria-label="Defensive techniques">${renderTechniqueChips(row.techniques)}</div>
+          </div>
         </article>
       `;
     })
@@ -259,8 +377,8 @@ function renderPolicy(score) {
 function renderTimeline() {
   const loadDelay = Math.max(0, Math.round((decisionLoad() - 20) / 6));
   els.timelineClock.textContent = `${recoveryWindow()}m`;
-  els.timelineList.innerHTML = mission().timeline
-    .map(([time, action], index) => {
+  els.timelineList.innerHTML = mission()
+    .timeline.map(([time, action], index) => {
       const minutes = Number.parseInt(time, 10) + index * loadDelay;
       return `
         <li>
@@ -275,8 +393,8 @@ function renderTimeline() {
 function renderSignals() {
   const score = signalScore();
   els.signalScore.textContent = `${score}%`;
-  els.signalList.innerHTML = mission().signals
-    .map((signal, index) => {
+  els.signalList.innerHTML = mission()
+    .signals.map((signal, index) => {
       const heat = index === 0 && pressureScore() > 58 ? "hot" : index === 1 ? "watch" : "safe";
       return `
         <article class="signal-row" data-heat="${heat}">
@@ -338,7 +456,10 @@ function renderDashboard() {
   els.mapTelemetry.textContent = `${active.nodes.length} assets, ${active.links.length} trust paths`;
 
   els.integrityRing.style.setProperty("--integrity", score);
-  els.integrityRing.style.setProperty("--integrity-color", score >= 66 ? colors.safe : score >= 48 ? colors.amber : colors.red);
+  els.integrityRing.style.setProperty(
+    "--integrity-color",
+    score >= 66 ? colors.safe : score >= 48 ? colors.amber : colors.red
+  );
   els.integrityScore.textContent = String(score);
   els.decisionHeadline.textContent = decisionHeadline(score);
   els.decisionSummary.textContent = decisionSummary(score);
@@ -472,11 +593,12 @@ function drawTwin(timestamp = 0) {
     const midY = (from.py + to.py) / 2;
     const curve = (index % 2 === 0 ? -1 : 1) * (36 + activity * 18);
 
-    twinCtx.strokeStyle = linkColor === colors.red
-      ? `rgba(255, 102, 125, ${0.16 + activity * 0.3})`
-      : linkColor === colors.amber
-        ? `rgba(255, 191, 90, ${0.18 + activity * 0.3})`
-        : `rgba(71, 214, 255, ${0.17 + activity * 0.26})`;
+    twinCtx.strokeStyle =
+      linkColor === colors.red
+        ? `rgba(255, 102, 125, ${0.16 + activity * 0.3})`
+        : linkColor === colors.amber
+          ? `rgba(255, 191, 90, ${0.18 + activity * 0.3})`
+          : `rgba(71, 214, 255, ${0.17 + activity * 0.26})`;
     twinCtx.lineWidth = 2 + activity * 2.3;
     twinCtx.beginPath();
     twinCtx.moveTo(from.px, from.py);
@@ -590,6 +712,8 @@ function drawContinuity() {
   continuityCtx.restore();
 }
 
+/* ─── Profile / portfolio ─────────────────────────────────────────── */
+
 function markProfileState(label) {
   els.profileState.textContent = label;
 }
@@ -609,6 +733,28 @@ function profilePayload() {
   };
 }
 
+function applyProfile(profile) {
+  if (!missions[profile.mission] || !lenses[profile.lens] || !horizonProfiles[profile.horizon]) {
+    return false;
+  }
+
+  state.mission = profile.mission;
+  state.lens = profile.lens;
+  state.horizon = Number(profile.horizon);
+  state.pressure = {
+    agent: clamp(Number(profile.pressure?.agent ?? state.pressure.agent), 0, 100),
+    supplier: clamp(Number(profile.pressure?.supplier ?? state.pressure.supplier), 0, 100),
+    data: clamp(Number(profile.pressure?.data ?? state.pressure.data), 0, 100)
+  };
+  state.controls = {
+    approvals: Boolean(profile.controls?.approvals),
+    recovery: Boolean(profile.controls?.recovery),
+    attestation: Boolean(profile.controls?.attestation),
+    privacy: Boolean(profile.controls?.privacy)
+  };
+  return true;
+}
+
 function updateControlsFromState() {
   els.agentRange.value = String(state.pressure.agent);
   els.supplierRange.value = String(state.pressure.supplier);
@@ -623,59 +769,641 @@ function updateControlsFromState() {
   setPressed([...document.querySelectorAll("[data-horizon]")], state.horizon, "horizon");
 }
 
-function saveProfile() {
+function persistPortfolio() {
   try {
-    window.localStorage.setItem(profileStorageKey, JSON.stringify(profilePayload()));
-    markProfileState("Saved");
+    const payload = {
+      version: 1,
+      activeProfile: state.activeProfileName,
+      profiles: portfolio,
+      current: profilePayload()
+    };
+    window.localStorage.setItem(portfolioStorageKey, JSON.stringify(payload));
+    return true;
   } catch {
+    return false;
+  }
+}
+
+function renderProfileList() {
+  const names = Object.keys(portfolio).sort((a, b) => a.localeCompare(b));
+  if (names.length === 0) {
+    els.profileList.innerHTML = `<li class="profile-empty">No saved profiles yet</li>`;
+    return;
+  }
+
+  els.profileList.innerHTML = names
+    .map((name) => {
+      const active = name === state.activeProfileName ? " is-active" : "";
+      const savedAt = portfolio[name]?.savedAt
+        ? new Date(portfolio[name].savedAt).toLocaleString()
+        : "";
+      return `
+        <li class="profile-item${active}" data-profile="${escapeHtml(name)}">
+          <div class="profile-item-meta">
+            <strong>${escapeHtml(name)}</strong>
+            <small>${escapeHtml(savedAt)}</small>
+          </div>
+          <div class="profile-item-actions">
+            <button type="button" data-profile-load="${escapeHtml(name)}" title="Load ${escapeHtml(name)}">Load</button>
+            <button type="button" data-profile-delete="${escapeHtml(name)}" title="Delete ${escapeHtml(name)}">Del</button>
+          </div>
+        </li>
+      `;
+    })
+    .join("");
+}
+
+function saveProfile(forceName) {
+  const name = sanitizeName(forceName ?? els.profileNameInput.value, state.activeProfileName || DEFAULT_PROFILE_NAME);
+  els.profileNameInput.value = name;
+  state.activeProfileName = name;
+  portfolio[name] = profilePayload();
+  if (persistPortfolio()) {
+    markProfileState("Saved");
+    renderProfileList();
+  } else {
     markProfileState("Blocked");
   }
 }
 
-function loadProfile() {
+function saveAsProfile() {
+  const name = sanitizeName(els.profileNameInput.value, "");
+  if (!name) {
+    els.profileNameInput.focus();
+    markProfileState("Name?");
+    return;
+  }
+  if (portfolio[name] && name !== state.activeProfileName) {
+    const overwrite = window.confirm(`Profile "${name}" already exists. Overwrite?`);
+    if (!overwrite) return;
+  }
+  saveProfile(name);
+}
+
+function loadNamedProfile(name) {
+  const profile = portfolio[name];
+  if (!profile) {
+    markProfileState("Empty");
+    return;
+  }
+  if (!applyProfile(profile)) {
+    markProfileState("Invalid");
+    return;
+  }
+  state.activeProfileName = name;
+  els.profileNameInput.value = name;
+  updateControlsFromState();
+  renderDashboard();
+  persistPortfolio();
+  markProfileState("Loaded");
+  renderProfileList();
+}
+
+function deleteNamedProfile(name) {
+  if (!portfolio[name]) return;
+  const confirmed = window.confirm(`Delete profile "${name}"?`);
+  if (!confirmed) return;
+  delete portfolio[name];
+  if (state.activeProfileName === name) {
+    state.activeProfileName = Object.keys(portfolio)[0] || DEFAULT_PROFILE_NAME;
+    els.profileNameInput.value = state.activeProfileName;
+  }
+  persistPortfolio();
+  markProfileState("Deleted");
+  renderProfileList();
+}
+
+function migrateLegacyProfile() {
   try {
-    const stored = window.localStorage.getItem(profileStorageKey);
+    const legacy = window.localStorage.getItem(legacyProfileKey);
+    if (!legacy) return;
+    const profile = JSON.parse(legacy);
+    if (profile && missions[profile.mission]) {
+      portfolio[DEFAULT_PROFILE_NAME] = {
+        mission: profile.mission,
+        lens: profile.lens ?? "board",
+        horizon: profile.horizon ?? 90,
+        pressure: profile.pressure ?? { ...state.pressure },
+        controls: profile.controls ?? { ...state.controls },
+        savedAt: profile.savedAt ?? new Date().toISOString()
+      };
+      state.activeProfileName = DEFAULT_PROFILE_NAME;
+      applyProfile(portfolio[DEFAULT_PROFILE_NAME]);
+    }
+    window.localStorage.removeItem(legacyProfileKey);
+  } catch {
+    // ignore corrupt legacy payload
+  }
+}
+
+function loadPortfolioFromStorage() {
+  try {
+    const stored = window.localStorage.getItem(portfolioStorageKey);
     if (!stored) {
-      markProfileState("Empty");
+      migrateLegacyProfile();
+      if (Object.keys(portfolio).length === 0) {
+        portfolio[DEFAULT_PROFILE_NAME] = profilePayload();
+      }
+      persistPortfolio();
+      markProfileState(Object.keys(portfolio).length ? "Ready" : "Unsaved");
       return;
     }
 
-    const profile = JSON.parse(stored);
-    if (!missions[profile.mission] || !lenses[profile.lens] || !horizonProfiles[profile.horizon]) {
-      markProfileState("Invalid");
-      return;
+    const data = JSON.parse(stored);
+    if (data?.profiles && typeof data.profiles === "object") {
+      portfolio = {};
+      Object.entries(data.profiles).forEach(([name, profile]) => {
+        if (profile && missions[profile.mission]) {
+          portfolio[sanitizeName(name)] = profile;
+        }
+      });
     }
 
-    state.mission = profile.mission;
-    state.lens = profile.lens;
-    state.horizon = Number(profile.horizon);
-    state.pressure = {
-      agent: clamp(Number(profile.pressure?.agent ?? state.pressure.agent), 0, 100),
-      supplier: clamp(Number(profile.pressure?.supplier ?? state.pressure.supplier), 0, 100),
-      data: clamp(Number(profile.pressure?.data ?? state.pressure.data), 0, 100)
-    };
-    state.controls = {
-      approvals: Boolean(profile.controls?.approvals),
-      recovery: Boolean(profile.controls?.recovery),
-      attestation: Boolean(profile.controls?.attestation),
-      privacy: Boolean(profile.controls?.privacy)
-    };
+    if (data?.current && missions[data.current.mission]) {
+      applyProfile(data.current);
+    } else if (data?.activeProfile && portfolio[data.activeProfile]) {
+      applyProfile(portfolio[data.activeProfile]);
+    }
 
-    updateControlsFromState();
-    renderDashboard();
+    state.activeProfileName = sanitizeName(
+      data?.activeProfile || Object.keys(portfolio)[0] || DEFAULT_PROFILE_NAME
+    );
     markProfileState("Loaded");
   } catch {
-    markProfileState("Invalid");
+    migrateLegacyProfile();
+    markProfileState("Local");
+  }
+
+  if (Object.keys(portfolio).length === 0) {
+    portfolio[DEFAULT_PROFILE_NAME] = profilePayload();
   }
 }
 
-function setInitialProfileState() {
+function exportPortfolio() {
+  const payload = {
+    project: "Aegis Horizon",
+    kind: "twin-portfolio",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    activeProfile: state.activeProfileName,
+    profiles: portfolio,
+    current: profilePayload(),
+    snapshots
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `aegis-horizon-portfolio-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  markProfileState("Exported");
+}
+
+function importPortfolioFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(String(reader.result));
+      if (!data || typeof data !== "object") throw new Error("invalid");
+
+      const incoming = data.profiles ?? (data.mission ? { [DEFAULT_PROFILE_NAME]: data } : null);
+      if (!incoming || typeof incoming !== "object") {
+        markProfileState("Invalid");
+        return;
+      }
+
+      let imported = 0;
+      Object.entries(incoming).forEach(([name, profile]) => {
+        if (profile && missions[profile.mission] && lenses[profile.lens] && horizonProfiles[profile.horizon]) {
+          portfolio[sanitizeName(name)] = {
+            mission: profile.mission,
+            lens: profile.lens,
+            horizon: Number(profile.horizon),
+            pressure: {
+              agent: clamp(Number(profile.pressure?.agent ?? 50), 0, 100),
+              supplier: clamp(Number(profile.pressure?.supplier ?? 50), 0, 100),
+              data: clamp(Number(profile.pressure?.data ?? 50), 0, 100)
+            },
+            controls: {
+              approvals: Boolean(profile.controls?.approvals),
+              recovery: Boolean(profile.controls?.recovery),
+              attestation: Boolean(profile.controls?.attestation),
+              privacy: Boolean(profile.controls?.privacy)
+            },
+            savedAt: profile.savedAt ?? new Date().toISOString()
+          };
+          imported += 1;
+        }
+      });
+
+      if (imported === 0) {
+        markProfileState("Invalid");
+        return;
+      }
+
+      if (data.current && missions[data.current.mission]) {
+        applyProfile(data.current);
+      } else if (data.activeProfile && portfolio[data.activeProfile]) {
+        applyProfile(portfolio[data.activeProfile]);
+        state.activeProfileName = sanitizeName(data.activeProfile);
+      } else {
+        const first = Object.keys(portfolio)[0];
+        applyProfile(portfolio[first]);
+        state.activeProfileName = first;
+      }
+
+      if (Array.isArray(data.snapshots)) {
+        snapshots = data.snapshots
+          .filter((snap) => snap && snap.name && typeof snap.integrity === "number")
+          .map((snap) => ({
+            id: snap.id || `snap-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            name: sanitizeName(snap.name, "Snapshot"),
+            capturedAt: snap.capturedAt ?? new Date().toISOString(),
+            mission: snap.mission,
+            missionTitle: snap.missionTitle,
+            lens: snap.lens,
+            horizon: snap.horizon,
+            integrity: snap.integrity,
+            continuity: snap.continuity,
+            decisionLoad: snap.decisionLoad,
+            coverage: snap.coverage,
+            pressure: snap.pressure ?? { agent: 0, supplier: 0, data: 0 },
+            controls: snap.controls ?? {}
+          }));
+        persistSnapshots();
+        renderSnapshotList();
+      }
+
+      els.profileNameInput.value = state.activeProfileName;
+      updateControlsFromState();
+      renderDashboard();
+      persistPortfolio();
+      renderProfileList();
+      markProfileState(`Imported ${imported}`);
+    } catch {
+      markProfileState("Invalid");
+    }
+  };
+  reader.onerror = () => markProfileState("Invalid");
+  reader.readAsText(file);
+}
+
+/* ─── Snapshots ───────────────────────────────────────────────────── */
+
+function persistSnapshots() {
   try {
-    markProfileState(window.localStorage.getItem(profileStorageKey) ? "Saved" : "Unsaved");
+    window.localStorage.setItem(snapshotsStorageKey, JSON.stringify(snapshots));
+    return true;
   } catch {
-    markProfileState("Local");
+    return false;
   }
 }
+
+function loadSnapshotsFromStorage() {
+  try {
+    const stored = window.localStorage.getItem(snapshotsStorageKey);
+    if (!stored) {
+      snapshots = [];
+      return;
+    }
+    const data = JSON.parse(stored);
+    snapshots = Array.isArray(data) ? data : [];
+  } catch {
+    snapshots = [];
+  }
+}
+
+function captureSnapshot() {
+  const name = sanitizeName(els.snapshotNameInput.value, `Snapshot ${snapshots.length + 1}`);
+  els.snapshotNameInput.value = name;
+  const snap = {
+    id: `snap-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    name,
+    capturedAt: new Date().toISOString(),
+    mission: state.mission,
+    missionTitle: mission().title,
+    code: mission().code,
+    lens: state.lens,
+    horizon: state.horizon,
+    integrity: integrityScore(),
+    continuity: continuityScore(),
+    decisionLoad: decisionLoad(),
+    coverage: coverage(),
+    pressure: { ...state.pressure },
+    controls: { ...state.controls }
+  };
+  snapshots.unshift(snap);
+  if (snapshots.length > 40) snapshots = snapshots.slice(0, 40);
+  persistSnapshots();
+  renderSnapshotList();
+  els.snapshotNameInput.value = "";
+}
+
+function deleteSnapshot(id) {
+  snapshots = snapshots.filter((snap) => snap.id !== id);
+  persistSnapshots();
+  renderSnapshotList();
+  if (!els.compareModal.hidden) {
+    fillCompareSelects();
+    renderCompareResults();
+  }
+}
+
+function renderSnapshotList() {
+  els.snapshotCount.textContent = String(snapshots.length);
+  if (snapshots.length === 0) {
+    els.snapshotList.innerHTML = `<li class="profile-empty">No snapshots yet</li>`;
+    return;
+  }
+
+  els.snapshotList.innerHTML = snapshots
+    .map((snap) => {
+      const when = new Date(snap.capturedAt).toLocaleString();
+      return `
+        <li class="snapshot-item" data-snapshot-id="${escapeHtml(snap.id)}">
+          <div class="profile-item-meta">
+            <strong>${escapeHtml(snap.name)}</strong>
+            <small>I ${snap.integrity}% · C ${snap.continuity}% · ${escapeHtml(when)}</small>
+          </div>
+          <div class="profile-item-actions">
+            <button type="button" data-snapshot-delete="${escapeHtml(snap.id)}" title="Delete snapshot">Del</button>
+          </div>
+        </li>
+      `;
+    })
+    .join("");
+}
+
+function fillCompareSelects() {
+  const options =
+    snapshots.length === 0
+      ? `<option value="">No snapshots</option>`
+      : snapshots
+          .map(
+            (snap) =>
+              `<option value="${escapeHtml(snap.id)}">${escapeHtml(snap.name)} (${snap.integrity}/${snap.continuity})</option>`
+          )
+          .join("");
+  const prevA = els.compareSelectA.value;
+  const prevB = els.compareSelectB.value;
+  els.compareSelectA.innerHTML = options;
+  els.compareSelectB.innerHTML = options;
+  if (snapshots.length >= 2) {
+    els.compareSelectA.value = snapshots.some((s) => s.id === prevA) ? prevA : snapshots[0].id;
+    els.compareSelectB.value = snapshots.some((s) => s.id === prevB) ? prevB : snapshots[1].id;
+  } else if (snapshots.length === 1) {
+    els.compareSelectA.value = snapshots[0].id;
+    els.compareSelectB.value = snapshots[0].id;
+  }
+}
+
+function deltaClass(value) {
+  if (value > 0) return "delta-up";
+  if (value < 0) return "delta-down";
+  return "delta-flat";
+}
+
+function formatDelta(value, suffix = "") {
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value}${suffix}`;
+}
+
+function renderCompareResults() {
+  const a = snapshots.find((s) => s.id === els.compareSelectA.value);
+  const b = snapshots.find((s) => s.id === els.compareSelectB.value);
+
+  if (!a || !b) {
+    els.compareResults.innerHTML = `<p class="muted-copy">Select two snapshots to see integrity, continuity, and pressure deltas.</p>`;
+    return;
+  }
+
+  const dIntegrity = b.integrity - a.integrity;
+  const dContinuity = b.continuity - a.continuity;
+  const dLoad = b.decisionLoad - a.decisionLoad;
+  const dCoverage = b.coverage - a.coverage;
+  const dAgent = (b.pressure?.agent ?? 0) - (a.pressure?.agent ?? 0);
+  const dSupplier = (b.pressure?.supplier ?? 0) - (a.pressure?.supplier ?? 0);
+  const dData = (b.pressure?.data ?? 0) - (a.pressure?.data ?? 0);
+
+  els.compareResults.innerHTML = `
+    <div class="compare-headers">
+      <div>
+        <span>A</span>
+        <strong>${escapeHtml(a.name)}</strong>
+        <small>${escapeHtml(a.missionTitle || a.mission || "")}</small>
+      </div>
+      <div>
+        <span>B</span>
+        <strong>${escapeHtml(b.name)}</strong>
+        <small>${escapeHtml(b.missionTitle || b.mission || "")}</small>
+      </div>
+    </div>
+    <table class="compare-table">
+      <thead>
+        <tr><th>Metric</th><th>A</th><th>B</th><th>Δ (B−A)</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Integrity</td>
+          <td>${a.integrity}%</td>
+          <td>${b.integrity}%</td>
+          <td class="${deltaClass(dIntegrity)}">${formatDelta(dIntegrity, "%")}</td>
+        </tr>
+        <tr>
+          <td>Continuity</td>
+          <td>${a.continuity}%</td>
+          <td>${b.continuity}%</td>
+          <td class="${deltaClass(dContinuity)}">${formatDelta(dContinuity, "%")}</td>
+        </tr>
+        <tr>
+          <td>Decision load</td>
+          <td>${a.decisionLoad}</td>
+          <td>${b.decisionLoad}</td>
+          <td class="${deltaClass(-dLoad)}">${formatDelta(dLoad)}</td>
+        </tr>
+        <tr>
+          <td>Safeguards</td>
+          <td>${a.coverage}%</td>
+          <td>${b.coverage}%</td>
+          <td class="${deltaClass(dCoverage)}">${formatDelta(dCoverage, "%")}</td>
+        </tr>
+        <tr>
+          <td>Agent authority</td>
+          <td>${a.pressure?.agent ?? "—"}</td>
+          <td>${b.pressure?.agent ?? "—"}</td>
+          <td class="${deltaClass(-dAgent)}">${formatDelta(dAgent)}</td>
+        </tr>
+        <tr>
+          <td>Supplier coupling</td>
+          <td>${a.pressure?.supplier ?? "—"}</td>
+          <td>${b.pressure?.supplier ?? "—"}</td>
+          <td class="${deltaClass(-dSupplier)}">${formatDelta(dSupplier)}</td>
+        </tr>
+        <tr>
+          <td>Data gravity</td>
+          <td>${a.pressure?.data ?? "—"}</td>
+          <td>${b.pressure?.data ?? "—"}</td>
+          <td class="${deltaClass(-dData)}">${formatDelta(dData)}</td>
+        </tr>
+        <tr>
+          <td>Horizon</td>
+          <td>${a.horizon}d</td>
+          <td>${b.horizon}d</td>
+          <td class="delta-flat">${a.horizon === b.horizon ? "same" : `${a.horizon}→${b.horizon}`}</td>
+        </tr>
+        <tr>
+          <td>Lens</td>
+          <td>${escapeHtml(a.lens)}</td>
+          <td>${escapeHtml(b.lens)}</td>
+          <td class="delta-flat">${a.lens === b.lens ? "same" : `${escapeHtml(a.lens)}→${escapeHtml(b.lens)}`}</td>
+        </tr>
+      </tbody>
+    </table>
+  `;
+}
+
+function openCompareModal() {
+  fillCompareSelects();
+  renderCompareResults();
+  els.compareModal.hidden = false;
+  els.closeCompareModal.focus();
+}
+
+function closeCompareModal() {
+  els.compareModal.hidden = true;
+}
+
+/* ─── Packet export + print report ────────────────────────────────── */
+
+async function digestText(text) {
+  if (!window.crypto?.subtle) return "unavailable";
+  const buffer = await window.crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(buffer)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function buildPacketPayload() {
+  const active = mission();
+  const score = integrityScore();
+  const rows = buildPolicyRows(score);
+  return {
+    project: "Aegis Horizon",
+    mode: "resilience-twin-studio",
+    mission: active.title,
+    code: active.code,
+    sector: active.sector,
+    crownJewel: active.crownJewel,
+    decisionLens: lens().label,
+    horizonDays: state.horizon,
+    integrity: score,
+    continuity: continuityScore(),
+    decisionLoad: decisionLoad(),
+    pressure: { ...state.pressure },
+    safeguards: { ...state.controls },
+    tabletopTimeline: active.timeline,
+    generatedPolicies: rows.map((row) => row.rule),
+    policyTechniques: rows.map((row) => ({
+      rule: row.rule,
+      techniques: techniqueLabelsSafe(row.techniques)
+    })),
+    techniqueCoverage: techniqueCoverage(rows).map((t) => t.label),
+    futuresSignals: active.signals,
+    evidence: active.evidence,
+    profileName: state.activeProfileName,
+    generatedAt: new Date().toISOString()
+  };
+}
+
+function techniqueLabelsSafe(ids) {
+  return ids.map((id) => techniqueCatalog[id]?.label ?? id);
+}
+
+async function exportPacket() {
+  const payload = buildPacketPayload();
+  const digest = await digestText(JSON.stringify(payload));
+  state.lastPacketDigest = digest;
+  const packet = { ...payload, integrityDigest: { algorithm: "SHA-256", digest } };
+  const blob = new Blob([JSON.stringify(packet, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `aegis-horizon-${mission().code.toLowerCase()}-packet.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function preparePrintReport() {
+  const active = mission();
+  const score = integrityScore();
+  const continuity = continuityScore();
+  const cover = coverage();
+  const rows = buildPolicyRows(score);
+  const coverageList = techniqueCoverage(rows);
+  const loadDelay = Math.max(0, Math.round((decisionLoad() - 20) / 6));
+  const ready = evidenceReady();
+
+  // Prefer last export digest; otherwise compute a fresh one for the report.
+  let digest = state.lastPacketDigest;
+  if (!digest || digest === "unavailable") {
+    digest = await digestText(JSON.stringify(buildPacketPayload()));
+    state.lastPacketDigest = digest;
+  }
+
+  els.printMissionTitle.textContent = active.title;
+  els.printMissionMeta.textContent = `${active.code} · ${active.sector} · ${lens().label} lens · ${horizon().label} horizon · Profile: ${state.activeProfileName}`;
+  els.printIntegrity.textContent = `${score}%`;
+  els.printContinuity.textContent = `${continuity}%`;
+  els.printSafeguards.textContent = `${cover}%`;
+  els.printDecisionLoad.textContent = String(decisionLoad());
+  els.printDecisionSummary.textContent = `${decisionHeadline(score)}. ${decisionSummary(score)}`;
+  els.printPressureSummary.textContent = `Pressure — agent ${state.pressure.agent}, supplier ${state.pressure.supplier}, data ${state.pressure.data} (avg ${pressureScore()}). Safeguards: approvals ${state.controls.approvals ? "on" : "off"}, recovery ${state.controls.recovery ? "on" : "off"}, attestation ${state.controls.attestation ? "on" : "off"}, privacy ${state.controls.privacy ? "on" : "off"}. Crown jewel: ${active.crownJewel}.`;
+
+  els.printPolicyList.innerHTML = rows
+    .map((row) => {
+      const chips = row.techniques.map((id) => techniqueCatalog[id]?.label ?? id).join(", ");
+      return `<li><strong>${escapeHtml(row.rule)}</strong><br><span class="print-chips">${escapeHtml(chips)}</span></li>`;
+    })
+    .join("");
+
+  els.printTechniqueList.innerHTML = coverageList
+    .map((t) => `<li><strong>${escapeHtml(t.label)}</strong> — ${escapeHtml(t.blurb)}</li>`)
+    .join("");
+
+  els.printTimelineList.innerHTML = active.timeline
+    .map(([time, action], index) => {
+      const minutes = Number.parseInt(time, 10) + index * loadDelay;
+      return `<li><strong>${String(minutes).padStart(2, "0")}m</strong> — ${escapeHtml(action)}</li>`;
+    })
+    .join("");
+
+  els.printEvidenceList.innerHTML = active.evidence
+    .map((item, index) => {
+      const mark = index < ready ? "☑" : "☐";
+      return `<li>${mark} ${escapeHtml(item)}</li>`;
+    })
+    .join("");
+
+  els.printGeneratedAt.textContent = `Generated ${new Date().toLocaleString()} · Aegis Horizon 1.1 · Local-first defensive twin`;
+  els.printDigest.textContent =
+    digest && digest !== "unavailable"
+      ? `SHA-256 packet digest: ${digest}`
+      : "SHA-256 packet digest: unavailable (WebCrypto not present)";
+}
+
+async function printReport() {
+  await preparePrintReport();
+  document.body.classList.add("is-printing");
+  window.print();
+  window.setTimeout(() => {
+    document.body.classList.remove("is-printing");
+  }, 400);
+}
+
+/* ─── Events ──────────────────────────────────────────────────────── */
 
 function runRehearsal() {
   els.rehearseButton.classList.add("is-busy");
@@ -687,47 +1415,6 @@ function runRehearsal() {
   markProfileChanged();
   renderDashboard();
   window.setTimeout(() => els.rehearseButton.classList.remove("is-busy"), 460);
-}
-
-async function digestText(text) {
-  if (!window.crypto?.subtle) return "unavailable";
-  const buffer = await window.crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return [...new Uint8Array(buffer)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-async function exportPacket() {
-  const active = mission();
-  const payload = {
-    project: "Aegis Horizon",
-    mode: "resilience-twin-studio",
-    mission: active.title,
-    code: active.code,
-    sector: active.sector,
-    crownJewel: active.crownJewel,
-    decisionLens: lens().label,
-    horizonDays: state.horizon,
-    integrity: integrityScore(),
-    continuity: continuityScore(),
-    decisionLoad: decisionLoad(),
-    pressure: { ...state.pressure },
-    safeguards: { ...state.controls },
-    tabletopTimeline: active.timeline,
-    generatedPolicies: generatedPolicies(integrityScore()),
-    futuresSignals: active.signals,
-    evidence: active.evidence,
-    generatedAt: new Date().toISOString()
-  };
-  const digest = await digestText(JSON.stringify(payload));
-  const packet = { ...payload, integrityDigest: { algorithm: "SHA-256", digest } };
-  const blob = new Blob([JSON.stringify(packet, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `aegis-horizon-${active.code.toLowerCase()}-packet.json`;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
 }
 
 function bindEvents() {
@@ -780,13 +1467,71 @@ function bindEvents() {
 
   els.rehearseButton.addEventListener("click", runRehearsal);
   els.exportButton.addEventListener("click", () => void exportPacket());
-  els.saveProfileButton.addEventListener("click", saveProfile);
-  els.loadProfileButton.addEventListener("click", loadProfile);
+  els.printReportButton.addEventListener("click", () => void printReport());
+
+  els.saveProfileButton.addEventListener("click", () => saveProfile());
+  els.saveAsProfileButton.addEventListener("click", saveAsProfile);
+
+  els.profileList.addEventListener("click", (event) => {
+    const loadBtn = event.target.closest("[data-profile-load]");
+    if (loadBtn) {
+      loadNamedProfile(loadBtn.dataset.profileLoad);
+      return;
+    }
+    const delBtn = event.target.closest("[data-profile-delete]");
+    if (delBtn) {
+      deleteNamedProfile(delBtn.dataset.profileDelete);
+    }
+  });
+
+  els.exportPortfolioButton.addEventListener("click", exportPortfolio);
+  els.importPortfolioButton.addEventListener("click", () => els.importPortfolioInput.click());
+  els.importPortfolioInput.addEventListener("change", () => {
+    const file = els.importPortfolioInput.files?.[0];
+    if (file) importPortfolioFile(file);
+    els.importPortfolioInput.value = "";
+  });
+
+  els.captureSnapshotButton.addEventListener("click", captureSnapshot);
+  els.compareSnapshotsButton.addEventListener("click", openCompareModal);
+  els.closeCompareModal.addEventListener("click", closeCompareModal);
+  els.compareModal.addEventListener("click", (event) => {
+    if (event.target === els.compareModal) closeCompareModal();
+  });
+  els.compareSelectA.addEventListener("change", renderCompareResults);
+  els.compareSelectB.addEventListener("change", renderCompareResults);
+
+  els.snapshotList.addEventListener("click", (event) => {
+    const delBtn = event.target.closest("[data-snapshot-delete]");
+    if (delBtn) deleteSnapshot(delBtn.dataset.snapshotDelete);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !els.compareModal.hidden) {
+      closeCompareModal();
+    }
+  });
+
+  window.addEventListener("beforeprint", () => {
+    void preparePrintReport();
+    document.body.classList.add("is-printing");
+  });
+  window.addEventListener("afterprint", () => {
+    document.body.classList.remove("is-printing");
+  });
+
   window.addEventListener("resize", drawContinuity);
 }
 
+/* ─── Boot ────────────────────────────────────────────────────────── */
+
+loadPortfolioFromStorage();
+loadSnapshotsFromStorage();
 renderMissionButtons();
+els.profileNameInput.value = state.activeProfileName;
+updateControlsFromState();
 bindEvents();
-setInitialProfileState();
+renderProfileList();
+renderSnapshotList();
 renderDashboard();
 drawTwin();
