@@ -4,13 +4,16 @@ Aegis Horizon is a local-first cyber resilience twin studio for future defensive
 
 The project is intentionally defensive. It contains no exploit code, credential harvesting logic, malware samples, scanner modules, or instructions for unauthorized access.
 
+**Live:** [https://sebby1770.github.io/aegis-horizon/](https://sebby1770.github.io/aegis-horizon/)
+
 ## What it does
 
-- Models six distinctive future systems: autonomous hospital care, autonomous ports, programmable treasury, frontier research, civic sensor grids, and orbital logistics.
+- Models seven distinctive future systems: autonomous hospital care, autonomous ports, programmable treasury, frontier research, civic sensor grids, municipal water SCADA, and orbital logistics.
 - Draws an animated resilience twin with crown jewels, agents, recovery lanes, policy gates, trust paths, and moving evidence signals.
 - Tunes decision lens, 30/90/180-day horizon, agent authority, supplier coupling, data gravity, and four defensive safeguards.
 - Generates a tabletop timeline, policy forge rules with **defensive technique chips**, futures signals, and evidence ledger from the current local model.
-- Produces a local policy packet as JSON with a browser-generated SHA-256 integrity digest when WebCrypto is available.
+- Produces a local policy packet as **JSON** (SHA-256 digest when WebCrypto is available) or **CSV** (`section,item` for policies, techniques, timeline, and evidence).
+- Walks a **tabletop rehearsal stepper** through timeline beats (Rehearse / Next beat / Reset, `[` / `]`).
 - Supports **multiple named twin profiles** in local storage (Save / Save As / Load / Delete), with migration from the older single-profile key.
 - **Import / export** the full twin portfolio (profiles + current state + snapshots) as JSON — all offline, no network calls.
 - Captures **comparison snapshots** of scores and pressure settings, with a side-by-side delta view.
@@ -31,7 +34,22 @@ http://127.0.0.1:4173
 
 No install step is required because the app has no runtime dependencies.
 
-## Local UX (v1.1)
+## Local UX (v1.2)
+
+### Tabletop rehearsal
+1. **Rehearse** (R) starts at the first timeline beat and highlights it.
+2. **Next beat** (N) or `]` advances; `[` steps back. The panel clock follows the active beat's time code.
+3. **Reset** (0) returns to the first beat.
+4. Click a timeline row to jump to that beat.
+
+### Packet CSV
+- Toolbar **CSV** downloads a deterministic `section,item` packet (policies, techniques, timeline, evidence). No secrets, profiles, or digests.
+
+### Water Grid
+- **Water Grid** is a municipal / civic water SCADA twin: potable-water continuity, named operator approval, and offline chemical-dose packets.
+
+### Scoring module
+- Integrity, continuity, coverage, policy rows, and CSV helpers live in `src/score.js` as pure functions so Node tests do not need the DOM.
 
 ### Named profiles
 1. Enter a name under **Local Profile**.
@@ -60,26 +78,32 @@ Policy Forge rules show blue-team technique chips such as Zero Trust, MFA / step
 npm test
 ```
 
-The validation script checks that static app files exist, the mission catalog is present, HTML references local assets only, and that portfolio export controls, techniques data, print styles, and package version `1.1.0` are present.
+The validation script checks that static app files exist, the mission catalog (including Water Grid) is present, HTML references local assets only, scoring is extracted to `src/score.js`, rehearsal/CSV controls exist, and package version `1.2.0` is set. `node --test tools/score.test.mjs` covers integrity bounds, coverage monotonicity, Water Grid shape, and CSV order.
 
 ## Publish on GitHub Pages
 
-In the repository settings, set Pages to deploy from the `main` branch and the repository root. The app is fully static, so no build command is required.
+In the repository settings, set Pages to deploy from the `main` branch and the repository root. The app is fully static, so no build command is required. A `.nojekyll` file is included so GitHub Pages serves the tree as-is.
+
+Live URL: [https://sebby1770.github.io/aegis-horizon/](https://sebby1770.github.io/aegis-horizon/)
 
 ## Project structure
 
 ```text
 .
 ├── index.html
+├── .nojekyll
+├── CHANGELOG.md
 ├── assets/
 │   └── aegis-mark.svg
 ├── src/
 │   ├── app.js
 │   ├── data.js
+│   ├── score.js
 │   ├── techniques.js
 │   └── styles.css
 ├── tools/
-│   └── validate.mjs
+│   ├── validate.mjs
+│   └── score.test.mjs
 └── SECURITY.md
 ```
 
@@ -89,6 +113,9 @@ In the repository settings, set Pages to deploy from the `main` branch and the r
 - [x] Add defensive technique mapping for each generated policy.
 - [x] Add printable board-level risk reports.
 - [x] Add multiple named local profiles and comparison snapshots.
+- [x] Extract scoring for DOM-free tests.
+- [x] Add municipal water SCADA continuity mission.
+- [x] Add tabletop rehearsal stepper and CSV packet export.
 - [ ] Add optional WebCrypto signing for exported policy packets (beyond SHA-256 digests).
 
 ## Safety boundary

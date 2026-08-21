@@ -638,9 +638,16 @@ h2 {
   line-height: 1.5;
 }
 
-.toolbar-actions {
+.toolbar-actions,
+.toolbar-group {
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+
+.toolbar-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .icon-button {
@@ -654,6 +661,20 @@ h2 {
 .icon-button span {
   width: 26px;
   height: 26px;
+}
+
+.icon-button.is-wide {
+  width: auto;
+  min-width: 44px;
+  padding: 0 8px;
+}
+
+.icon-button.is-wide span {
+  width: auto;
+  min-width: 26px;
+  padding: 0 7px;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
 }
 
 .icon-button.is-busy span {
@@ -789,6 +810,20 @@ h2 {
   grid-template-columns: 42px minmax(0, 1fr);
   gap: 10px;
   align-items: start;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.timeline-list li.is-active {
+  border-color: rgba(143, 240, 177, 0.55);
+  background: rgba(143, 240, 177, 0.1);
+}
+
+.timeline-list li.is-active span {
+  background: rgba(143, 240, 177, 0.28);
+  color: var(--text);
 }
 
 .timeline-list span {

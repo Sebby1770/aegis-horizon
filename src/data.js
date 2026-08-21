@@ -239,6 +239,54 @@ export const missions = {
     evidence: ["Sensor maintenance proof", "Privacy rule", "Public update log", "Field-team route"],
     future: [51, 56, 62, 67, 72, 76, 83]
   },
+  watergrid: {
+    code: "WG-17",
+    label: "Water Grid",
+    sector: "Municipal Water",
+    title: "Civic water SCADA continuity twin",
+    brief:
+      "Rehearse potable-water operations, operator approval, plant telemetry, and offline chemical-dose packets so civic supply stays safe when automation confidence fades.",
+    crownJewel: "Potable water authority",
+    promise: "Drinking water stays safe, attributable, and operator-approved even when plant trust degrades.",
+    baseIntegrity: 63,
+    signal: 84,
+    assets: 2760,
+    continuity: 71,
+    nodes: [
+      { id: "source-intake", label: "Source Intake", x: 0.18, y: 0.28, type: "device", weight: 0.66 },
+      { id: "plant-agent", label: "Plant Agent", x: 0.44, y: 0.21, type: "agent", weight: 0.78 },
+      { id: "dose-skid", label: "Dose Skid", x: 0.75, y: 0.33, type: "device", weight: 0.71 },
+      { id: "quality-core", label: "Quality Core", x: 0.57, y: 0.57, type: "crown", weight: 0.88 },
+      { id: "offline-dose", label: "Offline Dose", x: 0.28, y: 0.75, type: "recovery", weight: 0.51 },
+      { id: "ops-console", label: "Ops Console", x: 0.79, y: 0.76, type: "policy", weight: 0.56 }
+    ],
+    links: [
+      ["source-intake", "plant-agent", "flow"],
+      ["plant-agent", "dose-skid", "setpoint"],
+      ["dose-skid", "quality-core", "residual"],
+      ["quality-core", "offline-dose", "fallback"],
+      ["ops-console", "plant-agent", "approval"],
+      ["quality-core", "ops-console", "alarm"]
+    ],
+    timeline: [
+      ["00m", "Freeze autonomous dose changes and keep operator-approved setpoints"],
+      ["08m", "Switch chemical dosing to signed offline packets"],
+      ["20m", "Reconcile residual telemetry against the quality ledger"],
+      ["38m", "Issue civic continuity brief with operator evidence"]
+    ],
+    signals: [
+      "Dose-skid confidence drifted after a maintenance window",
+      "Plant agent proposed a residual change without fresh operator approval",
+      "Offline chemical-dose packet is inside freshness but near review"
+    ],
+    policies: [
+      "Chemical-dose changes require named operator approval before actuation",
+      "Plant agents fall back to offline dose packets when telemetry confidence drops",
+      "Quality-core alarms cannot clear without signed residual evidence"
+    ],
+    evidence: ["Operator approval", "Dose packet hash", "Residual attestation", "Civic-impact owner"],
+    future: [54, 59, 65, 70, 75, 80, 86]
+  },
   orbital: {
     code: "OL-50",
     label: "Orbital",

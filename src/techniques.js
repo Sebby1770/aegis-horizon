@@ -83,6 +83,11 @@ export const missionPolicyTechniques = {
     ["provenance-attestation", "zero-trust"],
     ["privacy-boundary", "least-privilege", "human-in-the-loop"]
   ],
+  watergrid: [
+    ["human-in-the-loop", "least-privilege"],
+    ["offline-continuity", "segmented-recovery", "zero-trust"],
+    ["provenance-attestation", "zero-trust"]
+  ],
   orbital: [
     ["least-privilege", "human-in-the-loop", "zero-trust"],
     ["mfa-step-up", "provenance-attestation", "zero-trust"],
@@ -93,11 +98,11 @@ export const missionPolicyTechniques = {
 /** Dynamic / generated policy phrase patterns → techniques. */
 const dynamicPatterns = [
   {
-    test: /require named owner approval|human approval|owner proof|owner confirmation|dispatcher approval|clinician attestation|board rules/i,
+    test: /require named owner approval|human approval|owner proof|owner confirmation|dispatcher approval|clinician attestation|board rules|operator approval/i,
     tags: ["human-in-the-loop"]
   },
   {
-    test: /offline recovery|offline pack|manual lane|fallback plan|delay plan|local order queues/i,
+    test: /offline recovery|offline pack|offline dose|manual lane|fallback plan|delay plan|local order queues/i,
     tags: ["offline-continuity", "segmented-recovery"]
   },
   {

@@ -1,9 +1,23 @@
 import { controlWeights, horizonProfiles, lenses, missions } from "./data.js";
 import {
   techniqueCatalog,
-  techniquesForPolicy,
   techniqueCoverage
 } from "./techniques.js";
+import {
+  buildPacketCsv,
+  buildPolicyRows as scorePolicyRows,
+  clamp,
+  continuityScore as scoreContinuity,
+  coverage as scoreCoverage,
+  decisionHeadline as scoreHeadline,
+  decisionLoad as scoreDecisionLoad,
+  decisionSummary as scoreSummary,
+  evidenceReady as scoreEvidenceReady,
+  integrityScore as scoreIntegrity,
+  pressureScore as scorePressure,
+  recoveryWindow as scoreRecoveryWindow,
+  signalScore as scoreSignal
+} from "./score.js";
 
 /** Legacy single-profile key (migrated on first load). */
 const legacyProfileKey = "aegis-horizon-twin-profile";
@@ -32,7 +46,8 @@ const state = {
   activeProfileName: DEFAULT_PROFILE_NAME,
   pulse: 0,
   frameTime: 0,
-  lastPacketDigest: null
+  lastPacketDigest: null,
+  rehearsalStep: 0
 };
 
 /** In-memory portfolio: { [name]: profilePayload } */
@@ -83,7 +98,10 @@ const els = {
   supplierRange: document.querySelector("#supplierRange"),
   dataRange: document.querySelector("#dataRange"),
   rehearseButton: document.querySelector("#rehearseButton"),
+  nextBeatButton: document.querySelector("#nextBeatButton"),
+  resetRehearsalButton: document.querySelector("#resetRehearsalButton"),
   exportButton: document.querySelector("#exportButton"),
+  csvExportButton: document.querySelector("#csvExportButton"),
   printReportButton: document.querySelector("#printReportButton"),
   saveProfileButton: document.querySelector("#saveProfileButton"),
   saveAsProfileButton: document.querySelector("#saveAsProfileButton"),
@@ -146,10 +164,6 @@ const typeColor = {
   edge: colors.cyan
 };
 
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
-
 function mission() {
   return missions[state.mission];
 }
@@ -162,90 +176,53 @@ function horizon() {
   return horizonProfiles[state.horizon] ?? horizonProfiles[90];
 }
 
+function scoreArgs() {
+  return [state, mission(), lens(), horizon(), controlWeights];
+}
+
 function pressureScore() {
-  return Math.round((state.pressure.agent + state.pressure.supplier + state.pressure.data) / 3);
+  return scorePressure(...scoreArgs());
 }
 
 function coverage() {
-  const enabled = Object.entries(state.controls).reduce((total, [key, enabledFlag]) => {
-    return total + (enabledFlag ? controlWeights[key] : 0);
-  }, 0);
-  const total = Object.values(controlWeights).reduce((sum, value) => sum + value, 0);
-  return Math.round((enabled / total) * 100);
+  return scoreCoverage(...scoreArgs());
 }
 
 function integrityScore() {
-  const active = mission();
-  const pressurePenalty =
-    state.pressure.agent * 0.15 + state.pressure.supplier * 0.12 + state.pressure.data * 0.11;
-  const safeguardLift = coverage() * 0.28;
-  const recoveryLift = state.controls.recovery ? 4 : -4;
-  const attestationLift = state.controls.attestation ? 4 : -3;
-  return clamp(
-    Math.round(
-      active.baseIntegrity +
-        safeguardLift -
-        pressurePenalty -
-        horizon().drift +
-        lens().integrityShift +
-        recoveryLift +
-        attestationLift
-    ),
-    12,
-    98
-  );
+  return scoreIntegrity(...scoreArgs());
 }
 
 function continuityScore() {
-  const active = mission();
-  const recoveryLift = state.controls.recovery ? 10 : -8;
-  const privacyLift = state.controls.privacy ? 3 : -4;
-  return clamp(
-    Math.round(
-      active.continuity + coverage() * 0.16 - pressureScore() * 0.13 - horizon().drift + recoveryLift + privacyLift
-    ),
-    8,
-    98
-  );
+  return scoreContinuity(...scoreArgs());
 }
 
 function decisionLoad() {
-  const horizonLoad = state.horizon === 180 ? 10 : state.horizon === 30 ? -2 : 4;
-  return clamp(
-    Math.round(12 + pressureScore() * 0.34 + mission().nodes.length + lens().loadShift + horizonLoad - coverage() * 0.09),
-    4,
-    72
-  );
+  return scoreDecisionLoad(...scoreArgs());
 }
 
 function evidenceReady() {
-  return Object.values(state.controls).filter(Boolean).length;
+  return scoreEvidenceReady(...scoreArgs());
 }
 
 function signalScore() {
-  return clamp(mission().signal + Math.round((coverage() - 70) / 5) - Math.round((pressureScore() - 50) / 8), 42, 99);
+  return scoreSignal(...scoreArgs());
 }
 
 function recoveryWindow() {
-  const lastStep = mission().timeline.at(-1)?.[0] ?? "30m";
-  const baseline = Number.parseInt(lastStep, 10) || 30;
-  const delay = Math.max(0, Math.round((decisionLoad() - 24) / 3));
-  return clamp(baseline + delay - (state.controls.recovery ? 5 : 0), 12, 96);
+  return scoreRecoveryWindow(...scoreArgs());
 }
 
 function decisionHeadline(score) {
-  if (score >= 82) return "Resilient by design";
-  if (score >= 66) return "Continuity-first posture";
-  if (score >= 48) return "Decision friction building";
-  return "Policy debt is visible";
+  return scoreHeadline(score, ...scoreArgs());
 }
 
 function decisionSummary(score) {
-  const active = mission();
-  if (score >= 82) return `${active.crownJewel} has enough evidence for a high-confidence ${lens().caption.toLowerCase()}.`;
-  if (score >= 66) return `${active.crownJewel} is defensible, but the next rehearsal should reduce authority and supplier ambiguity.`;
-  if (score >= 48) return `${active.crownJewel} needs clearer approval paths before the ${horizon().label} horizon arrives.`;
-  return `${active.crownJewel} should not absorb more autonomy until missing safeguards are restored.`;
+  return scoreSummary(score, ...scoreArgs());
+}
+
+function rehearsalIndex() {
+  const last = Math.max(0, mission().timeline.length - 1);
+  return clamp(Number(state.rehearsalStep) || 0, 0, last);
 }
 
 function escapeHtml(value) {
@@ -292,55 +269,8 @@ function renderMissionButtons() {
     .join("");
 }
 
-/**
- * Build policy rules with defensive technique tags.
- * @returns {Array<{ rule: string, techniques: string[], source: "generated"|"mission" }>}
- */
 function buildPolicyRows(score) {
-  const active = mission();
-  const generated = [];
-
-  if (!state.controls.approvals) {
-    generated.push(`IF ${active.crownJewel} changes THEN require named owner approval before action.`);
-  }
-  if (!state.controls.recovery) {
-    generated.push("IF continuity confidence drops THEN activate an offline recovery owner before automation proceeds.");
-  }
-  if (!state.controls.attestation) {
-    generated.push("IF a system writes to a crown-jewel path THEN attach signed evidence to the decision record.");
-  }
-  if (!state.controls.privacy) {
-    generated.push("IF people or sensitive context appears THEN enforce a privacy boundary before publishing.");
-  }
-  if (state.pressure.agent > 64) {
-    generated.push("IF agent authority rises above threshold THEN convert high-impact actions to draft-only mode.");
-  }
-  if (state.pressure.supplier > 64) {
-    generated.push("IF supplier coupling rises THEN require provenance before system-to-system trust.");
-  }
-  if (score < 55) {
-    generated.push("IF integrity is tense THEN pause new autonomy until safeguards are restored.");
-  }
-
-  const rows = [];
-
-  generated.forEach((rule) => {
-    rows.push({
-      rule,
-      techniques: techniquesForPolicy(rule, state.mission),
-      source: "generated"
-    });
-  });
-
-  active.policies.forEach((rule, index) => {
-    rows.push({
-      rule,
-      techniques: techniquesForPolicy(rule, state.mission, index),
-      source: "mission"
-    });
-  });
-
-  return rows.slice(0, 5);
+  return scorePolicyRows(score, ...scoreArgs());
 }
 
 function generatedPolicies(score) {
@@ -376,14 +306,22 @@ function renderPolicy(score) {
 
 function renderTimeline() {
   const loadDelay = Math.max(0, Math.round((decisionLoad() - 20) / 6));
-  els.timelineClock.textContent = `${recoveryWindow()}m`;
-  els.timelineList.innerHTML = mission()
-    .timeline.map(([time, action], index) => {
-      const minutes = Number.parseInt(time, 10) + index * loadDelay;
+  const step = rehearsalIndex();
+  const beats = mission().timeline.map(([time, action], index) => {
+    const minutes = Number.parseInt(time, 10) + index * loadDelay;
+    return { minutes, action, index };
+  });
+  const current = beats[step];
+  els.timelineClock.textContent = current
+    ? `${String(current.minutes).padStart(2, "0")}m`
+    : `${recoveryWindow()}m`;
+  els.timelineList.innerHTML = beats
+    .map((beat) => {
+      const active = beat.index === step;
       return `
-        <li>
-          <span>${String(minutes).padStart(2, "0")}m</span>
-          <p>${escapeHtml(action)}</p>
+        <li${active ? ' class="is-active" aria-current="step"' : ""} data-beat="${beat.index}">
+          <span>${String(beat.minutes).padStart(2, "0")}m</span>
+          <p>${escapeHtml(beat.action)}</p>
         </li>
       `;
     })
@@ -752,6 +690,7 @@ function applyProfile(profile) {
     attestation: Boolean(profile.controls?.attestation),
     privacy: Boolean(profile.controls?.privacy)
   };
+  state.rehearsalStep = 0;
   return true;
 }
 
@@ -1387,7 +1326,7 @@ async function preparePrintReport() {
     })
     .join("");
 
-  els.printGeneratedAt.textContent = `Generated ${new Date().toLocaleString()} · Aegis Horizon 1.1 · Local-first defensive twin`;
+  els.printGeneratedAt.textContent = `Generated ${new Date().toLocaleString()} · Aegis Horizon 1.2 · Local-first defensive twin`;
   els.printDigest.textContent =
     digest && digest !== "unavailable"
       ? `SHA-256 packet digest: ${digest}`
@@ -1405,16 +1344,40 @@ async function printReport() {
 
 /* ─── Events ──────────────────────────────────────────────────────── */
 
-function runRehearsal() {
+function startRehearsal() {
+  state.rehearsalStep = 0;
   els.rehearseButton.classList.add("is-busy");
-  const direction = Math.random() > 0.5 ? 5 : -4;
-  state.pressure.agent = clamp(state.pressure.agent + direction, 0, 100);
-  state.pressure.supplier = clamp(state.pressure.supplier + Math.round(direction / 2), 0, 100);
-  state.pressure.data = clamp(state.pressure.data + (Math.random() > 0.5 ? 3 : -2), 0, 100);
-  updateControlsFromState();
-  markProfileChanged();
   renderDashboard();
   window.setTimeout(() => els.rehearseButton.classList.remove("is-busy"), 460);
+}
+
+function nextRehearsalBeat() {
+  const last = Math.max(0, mission().timeline.length - 1);
+  state.rehearsalStep = Math.min(last, rehearsalIndex() + 1);
+  renderDashboard();
+}
+
+function previousRehearsalBeat() {
+  state.rehearsalStep = Math.max(0, rehearsalIndex() - 1);
+  renderDashboard();
+}
+
+function resetRehearsal() {
+  state.rehearsalStep = 0;
+  renderDashboard();
+}
+
+function exportPacketCsv() {
+  const csv = buildPacketCsv(integrityScore(), ...scoreArgs());
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `aegis-horizon-${mission().code.toLowerCase()}-packet.csv`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function bindEvents() {
@@ -1422,6 +1385,7 @@ function bindEvents() {
     const button = event.target.closest("[data-mission]");
     if (!button) return;
     state.mission = button.dataset.mission;
+    state.rehearsalStep = 0;
     setPressed([...els.missionButtons.querySelectorAll("button")], state.mission, "mission");
     markProfileChanged();
     renderDashboard();
@@ -1465,9 +1429,19 @@ function bindEvents() {
     });
   });
 
-  els.rehearseButton.addEventListener("click", runRehearsal);
+  els.rehearseButton.addEventListener("click", startRehearsal);
+  els.nextBeatButton.addEventListener("click", nextRehearsalBeat);
+  els.resetRehearsalButton.addEventListener("click", resetRehearsal);
   els.exportButton.addEventListener("click", () => void exportPacket());
+  els.csvExportButton.addEventListener("click", exportPacketCsv);
   els.printReportButton.addEventListener("click", () => void printReport());
+
+  els.timelineList.addEventListener("click", (event) => {
+    const item = event.target.closest("[data-beat]");
+    if (!item) return;
+    state.rehearsalStep = Number(item.dataset.beat);
+    renderDashboard();
+  });
 
   els.saveProfileButton.addEventListener("click", () => saveProfile());
   els.saveAsProfileButton.addEventListener("click", saveAsProfile);
@@ -1509,6 +1483,15 @@ function bindEvents() {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !els.compareModal.hidden) {
       closeCompareModal();
+      return;
+    }
+    if (event.target instanceof Element && event.target.closest("input, textarea, select, [contenteditable='true']")) return;
+    if (event.key === "]") {
+      event.preventDefault();
+      nextRehearsalBeat();
+    } else if (event.key === "[") {
+      event.preventDefault();
+      previousRehearsalBeat();
     }
   });
 

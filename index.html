@@ -187,15 +187,28 @@
               <p id="missionBrief">Model patient identity, ward devices, clinical agents, and offline recovery as one living defensive system before disruption reaches care delivery.</p>
             </div>
             <div class="toolbar-actions">
-              <button class="icon-button" id="rehearseButton" type="button" aria-label="Run rehearsal" title="Run rehearsal">
-                <span aria-hidden="true">R</span>
-              </button>
-              <button class="icon-button" id="exportButton" type="button" aria-label="Export policy packet" title="Export policy packet">
-                <span aria-hidden="true">E</span>
-              </button>
-              <button class="icon-button" id="printReportButton" type="button" aria-label="Print board-level risk report" title="Print report">
-                <span aria-hidden="true">P</span>
-              </button>
+              <div class="toolbar-group" role="group" aria-label="Tabletop rehearsal">
+                <button class="icon-button" id="rehearseButton" type="button" aria-label="Rehearse" title="Rehearse from first beat">
+                  <span aria-hidden="true">R</span>
+                </button>
+                <button class="icon-button" id="nextBeatButton" type="button" aria-label="Next beat" title="Next beat (])">
+                  <span aria-hidden="true">N</span>
+                </button>
+                <button class="icon-button" id="resetRehearsalButton" type="button" aria-label="Reset rehearsal" title="Reset rehearsal">
+                  <span aria-hidden="true">0</span>
+                </button>
+              </div>
+              <div class="toolbar-group" role="group" aria-label="Packet export">
+                <button class="icon-button" id="exportButton" type="button" aria-label="Export policy packet JSON" title="Export JSON">
+                  <span aria-hidden="true">E</span>
+                </button>
+                <button class="icon-button is-wide" id="csvExportButton" type="button" aria-label="Export policy packet CSV" title="Export CSV">
+                  <span aria-hidden="true">CSV</span>
+                </button>
+                <button class="icon-button" id="printReportButton" type="button" aria-label="Print board-level risk report" title="Print report">
+                  <span aria-hidden="true">P</span>
+                </button>
+              </div>
             </div>
           </div>
 
