@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.6.0] — 2026-08-21
+
+### Added
+- Hottest node (`hottestNode`) on map telemetry (highest `weight`; first node on ties).
+- Horizon drop (`horizonDrop`) under the 30/90/180 strip — integrity at 30d minus 180d.
+- Best control flip (`bestFlip`) highlighted in the Gaps table (largest Δ integrity; first key on ties).
+
+### Changed
+- Package version `1.6.0`.
+
+## [1.5.0] — 2026-08-21
+
+### Added
+- Horizon strip (`horizonStrip`) under decision scores — 30d / 90d / 180d integrity without changing the selected horizon.
+- Crown neighbors (`crownNeighbors`) on map telemetry (undirected links to the `type==="crown"` node).
+- Board blurb (`boardBlurb`) under posture advice: crown jewel at integrity, watch the weakest node.
+
+### Changed
+- Package version `1.5.0`.
+
 ## [1.4.0] — 2026-08-21
 
 ### Added

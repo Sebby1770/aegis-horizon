@@ -34,6 +34,28 @@ http://127.0.0.1:4173
 
 No install step is required because the app has no runtime dependencies.
 
+## Local UX (v1.6)
+
+### Hottest node
+- Map telemetry includes the highest-weight node (`hottestNode`; first node wins ties).
+
+### Horizon drop
+- Under the 30/90/180 strip, `horizonDrop` shows integrity at 30d, 180d, and the difference (30 minus 180). Null when either horizon is missing.
+
+### Best flip
+- The Gaps panel highlights the safeguard flip with the largest Δ integrity (`bestFlip`) and names it in the caption.
+
+## Local UX (v1.5)
+
+### Horizon strip
+- Decision panel shows 30d / 90d / 180d integrity from `horizonStrip` (same pressure and safeguards; missing horizon keys are skipped).
+
+### Crown neighbors
+- Map telemetry lists nodes linked to the crown jewel (`crownNeighbors`; undirected). Empty when there is no crown node.
+
+### Board blurb
+- One sentence under posture advice (`boardBlurb`): `{crown jewel} at integrity {score}; watch {weakest label}.` Omits the watch clause when there is no weakest node.
+
 ## Local UX (v1.4)
 
 ### Control gaps
@@ -108,7 +130,7 @@ Policy Forge rules show blue-team technique chips such as Zero Trust, MFA / step
 npm test
 ```
 
-The validation script checks that static app files exist, the mission catalog (including Water Grid) is present, HTML references local assets only, scoring is extracted to `src/score.js`, rehearsal/CSV/sweep/gaps/compare/markdown/heatmap/help controls exist, and package version `1.4.0` is set. `node --test tools/score.test.mjs` covers integrity bounds, coverage monotonicity, Water Grid shape, CSV order, pressure sweeps, mission compare, packet markdown, finite control-flip deltas, weakest Water Grid node, and recovery posture advice.
+The validation script checks that static app files exist, the mission catalog (including Water Grid) is present, HTML references local assets only, scoring is extracted to `src/score.js`, rehearsal/CSV/sweep/gaps/compare/markdown/heatmap/help/horizon-strip/blurb/drop/hottest/best-flip controls exist, and package version `1.6.0` is set. `node --test tools/score.test.mjs` covers integrity bounds, coverage monotonicity, Water Grid shape, CSV order, pressure sweeps, mission compare, packet markdown, finite control-flip deltas, weakest and hottest Water Grid nodes, recovery posture advice, 30/90/180 horizon strips, horizon drop, crown neighbors, board blurb, and best-flip selection. Live Pages URL: https://sebby1770.github.io/aegis-horizon/
 
 ## Publish on GitHub Pages
 
@@ -148,6 +170,7 @@ Live URL: [https://sebby1770.github.io/aegis-horizon/](https://sebby1770.github.
 - [x] Add tabletop rehearsal stepper and CSV packet export.
 - [x] Add pressure sweep, mission compare, packet markdown, heatmap, and keyboard help.
 - [x] Add control-gap deltas, weakest-node telemetry, and defensive posture advice.
+- [x] Add 30/90/180 horizon strip, crown-neighbor telemetry, and board blurb.
 - [ ] Add optional WebCrypto signing for exported policy packets (beyond SHA-256 digests).
 
 ## Safety boundary

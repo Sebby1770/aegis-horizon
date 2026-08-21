@@ -17,6 +17,12 @@ import {
   evidenceReady as scoreEvidenceReady,
   integrityScore as scoreIntegrity,
   packetMarkdown,
+  bestFlip,
+  boardBlurb,
+  crownNeighbors,
+  hottestNode,
+  horizonDrop,
+  horizonStrip,
   postureAdvice,
   pressureScore as scorePressure,
   pressureSweep,
@@ -87,6 +93,9 @@ const els = {
   decisionHeadline: document.querySelector("#decisionHeadline"),
   decisionSummary: document.querySelector("#decisionSummary"),
   adviceList: document.querySelector("#adviceList"),
+  boardBlurb: document.querySelector("#boardBlurb"),
+  horizonStrip: document.querySelector("#horizonStrip"),
+  horizonDrop: document.querySelector("#horizonDrop"),
   horizonCaption: document.querySelector("#horizonCaption"),
   decisionLoad: document.querySelector("#decisionLoad"),
   safeguardMetric: document.querySelector("#safeguardMetric"),
@@ -419,9 +428,16 @@ function renderDashboard() {
   els.crownLabel.textContent = active.crownJewel;
   els.promiseLabel.textContent = active.promise;
   const weak = weakestNode(active);
-  els.mapTelemetry.textContent = weak
-    ? `${active.nodes.length} assets, ${active.links.length} trust paths · weakest ${weak.label}`
-    : `${active.nodes.length} assets, ${active.links.length} trust paths`;
+  const hot = hottestNode(active);
+  const crown = crownNeighbors(active);
+  const neighborLabels = crown.neighbors.map((node) => node.label).join(", ");
+  const telemetry = [`${active.nodes.length} assets, ${active.links.length} trust paths`];
+  if (weak) telemetry.push(`weakest ${weak.label}`);
+  if (hot) telemetry.push(`hottest ${hot.label}`);
+  if (crown.crown) {
+    telemetry.push(neighborLabels ? `neighbors ${neighborLabels}` : "neighbors none");
+  }
+  els.mapTelemetry.textContent = telemetry.join(" · ");
 
   els.integrityRing.style.setProperty("--integrity", score);
   els.integrityRing.style.setProperty(
@@ -432,6 +448,8 @@ function renderDashboard() {
   els.decisionHeadline.textContent = decisionHeadline(score);
   els.decisionSummary.textContent = decisionSummary(score);
   renderAdvice(score);
+  els.boardBlurb.textContent = boardBlurb(score, active, weak);
+  renderHorizonStrip();
   els.horizonCaption.textContent = `${horizon().caption} via ${lens().caption.toLowerCase()}`;
   els.decisionLoad.textContent = `${decisionLoad()} moves`;
   els.safeguardMetric.textContent = `${cover}%`;
@@ -1445,6 +1463,26 @@ function renderAdvice(score) {
   els.adviceList.innerHTML = items.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
 }
 
+function renderHorizonStrip() {
+  const rows = horizonStrip(state, mission(), lens(), horizonProfiles, controlWeights);
+  els.horizonStrip.innerHTML = rows
+    .map((row) => {
+      return `
+        <div>
+          <span>${escapeHtml(row.label)}</span>
+          <strong>${row.integrity}</strong>
+        </div>
+      `;
+    })
+    .join("");
+  const drop = horizonDrop(state, mission(), lens(), horizonProfiles, controlWeights);
+  if (els.horizonDrop) {
+    els.horizonDrop.textContent = drop
+      ? `30d ${drop.at30} → 180d ${drop.at180} · drop ${drop.drop}`
+      : "";
+  }
+}
+
 function closeSweepModal() {
   els.sweepModal.hidden = true;
 }
@@ -1506,8 +1544,12 @@ function openSweepModal() {
 
 function renderGapsTable() {
   const result = controlDeltas(...scoreArgs());
+  const best = bestFlip(...scoreArgs());
+  const bestLine = best
+    ? `Best flip ${best.key} (${best.wouldBe ? "on" : "off"}) ${formatDelta(best.dIntegrity)} integrity.`
+    : "No safeguard keys to flip.";
   els.gapsTable.innerHTML = `
-    <p class="muted-copy">Current integrity ${result.currentIntegrity}% · continuity ${result.currentContinuity}%.</p>
+    <p class="muted-copy">Current integrity ${result.currentIntegrity}% · continuity ${result.currentContinuity}%. ${bestLine}</p>
     <table class="compare-table sweep-table">
       <thead>
         <tr>
@@ -1519,8 +1561,9 @@ function renderGapsTable() {
       <tbody>
         ${result.flips
           .map((row) => {
+            const isBest = best && row.key === best.key;
             return `
-              <tr>
+              <tr${isBest ? ' class="is-best-flip"' : ""}>
                 <td>${escapeHtml(row.key)}</td>
                 <td>${row.wouldBe ? "true" : "false"}</td>
                 <td class="${deltaClass(row.dIntegrity)}">${formatDelta(row.dIntegrity)}</td>

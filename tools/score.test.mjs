@@ -3,13 +3,19 @@ import { describe, it } from "node:test";
 
 import { controlWeights, horizonProfiles, lenses, missions } from "../src/data.js";
 import {
+  bestFlip,
+  boardBlurb,
   buildPacketCsv,
   buildPacketCsvRecords,
   compareMissions,
   continuityScore,
   controlDeltas,
   coverage,
+  crownNeighbors,
   csvEscape,
+  hottestNode,
+  horizonDrop,
+  horizonStrip,
   integrityScore,
   packetMarkdown,
   postureAdvice,
@@ -259,6 +265,132 @@ describe("postureAdvice", () => {
     assert.ok(postureAdvice(54, allOn).includes("Pause new autonomy until safeguards return"));
     assert.equal(postureAdvice(55, allOn).includes("Pause new autonomy until safeguards return"), false);
     assert.ok(postureAdvice(80, { ...allOn, controls: { ...allOn.controls, approvals: false } }).includes("Restore named-owner approvals"));
+  });
+});
+
+describe("horizonStrip", () => {
+  it("scores 30/90/180 from horizonProfiles without mutating state", () => {
+    const horizonBefore = defaultState.horizon;
+    const rows = horizonStrip(defaultState, missions.caremesh, lenses.board, horizonProfiles, controlWeights);
+
+    assert.equal(rows.length, 3);
+    assert.deepEqual(
+      rows.map((row) => row.days),
+      [30, 90, 180]
+    );
+    assert.deepEqual(
+      rows.map((row) => row.label),
+      ["30d", "90d", "180d"]
+    );
+
+    for (const row of rows) {
+      const horizon = horizonProfiles[row.days];
+      assert.equal(Number.isFinite(row.integrity), true);
+      assert.equal(Number.isFinite(row.continuity), true);
+      assert.equal(row.integrity, integrityScore(defaultState, missions.caremesh, lenses.board, horizon, controlWeights));
+      assert.equal(row.continuity, continuityScore(defaultState, missions.caremesh, lenses.board, horizon, controlWeights));
+    }
+
+    assert.ok(rows[0].integrity > rows[1].integrity);
+    assert.ok(rows[1].integrity > rows[2].integrity);
+    assert.equal(defaultState.horizon, horizonBefore);
+  });
+
+  it("skips missing horizon keys", () => {
+    const partial = { 30: horizonProfiles[30], 180: horizonProfiles[180] };
+    const rows = horizonStrip(defaultState, missions.caremesh, lenses.board, partial, controlWeights);
+    assert.equal(rows.length, 2);
+    assert.deepEqual(
+      rows.map((row) => row.days),
+      [30, 180]
+    );
+  });
+});
+
+describe("crownNeighbors", () => {
+  it("returns undirected neighbors of the watergrid crown", () => {
+    const result = crownNeighbors(missions.watergrid);
+    assert.equal(result.crown.id, "quality-core");
+    assert.equal(result.crown.label, "Quality Core");
+    assert.deepEqual(
+      result.neighbors.map((node) => node.id),
+      ["dose-skid", "offline-dose", "ops-console"]
+    );
+    assert.deepEqual(
+      result.neighbors.map((node) => node.label),
+      ["Dose Skid", "Offline Dose", "Ops Console"]
+    );
+  });
+
+  it("returns empty neighbors when there is no crown", () => {
+    const result = crownNeighbors({
+      nodes: [{ id: "only", label: "Only", type: "agent" }],
+      links: [["only", "only", "loop"]]
+    });
+    assert.equal(result.crown, null);
+    assert.deepEqual(result.neighbors, []);
+  });
+});
+
+describe("boardBlurb", () => {
+  it("names the crown jewel, score, and weakest node", () => {
+    const weak = weakestNode(missions.watergrid);
+    assert.equal(
+      boardBlurb(71, missions.watergrid, weak),
+      "Potable water authority at integrity 71; watch Offline Dose."
+    );
+  });
+
+  it("omits the watch clause when weakest is missing", () => {
+    assert.equal(boardBlurb(80, missions.caremesh, null), "Patient continuity ledger at integrity 80.");
+  });
+});
+
+describe("hottestNode", () => {
+  it("returns the highest-weight watergrid node, first on ties", () => {
+    const node = hottestNode(missions.watergrid);
+    assert.equal(node.id, "quality-core");
+    assert.equal(node.label, "Quality Core");
+    assert.equal(node.weight, 0.88);
+
+    const tied = {
+      nodes: [
+        { id: "first", label: "First", weight: 0.9 },
+        { id: "second", label: "Second", weight: 0.9 }
+      ]
+    };
+    assert.equal(hottestNode(tied).id, "first");
+    assert.equal(hottestNode({ nodes: [] }), null);
+  });
+});
+
+describe("horizonDrop", () => {
+  it("is 30d integrity minus 180d integrity", () => {
+    const drop = horizonDrop(defaultState, missions.caremesh, lenses.board, horizonProfiles, controlWeights);
+    const at30 = integrityScore(defaultState, missions.caremesh, lenses.board, horizonProfiles[30], controlWeights);
+    const at180 = integrityScore(defaultState, missions.caremesh, lenses.board, horizonProfiles[180], controlWeights);
+    assert.equal(drop.at30, at30);
+    assert.equal(drop.at180, at180);
+    assert.equal(drop.drop, at30 - at180);
+    assert.ok(drop.drop > 0);
+  });
+
+  it("returns null when 30 or 180 is missing", () => {
+    assert.equal(
+      horizonDrop(defaultState, missions.caremesh, lenses.board, { 90: horizonProfiles[90] }, controlWeights),
+      null
+    );
+  });
+});
+
+describe("bestFlip", () => {
+  it("is the controlDeltas flip with the largest dIntegrity", () => {
+    const deltas = controlDeltas(...argsFor());
+    const best = bestFlip(...argsFor());
+    const maxDelta = Math.max(...deltas.flips.map((row) => row.dIntegrity));
+    assert.equal(best.dIntegrity, maxDelta);
+    assert.equal(best.key, deltas.flips.find((row) => row.dIntegrity === maxDelta).key);
+    assert.equal(bestFlip({ ...defaultState, controls: {} }, ...argsFor().slice(1)), null);
   });
 });
 

@@ -135,6 +135,110 @@ export function weakestNode(mission) {
 }
 
 /**
+ * Highest-weight twin node. Ties keep the first node in the array.
+ * @returns {{ id: string, label: string, weight: number } | null}
+ */
+export function hottestNode(mission) {
+  const nodes = mission?.nodes ?? [];
+  if (!nodes.length) return null;
+
+  let hottest = nodes[0];
+  for (let i = 1; i < nodes.length; i += 1) {
+    if (nodes[i].weight > hottest.weight) hottest = nodes[i];
+  }
+
+  return { id: hottest.id, label: hottest.label, weight: hottest.weight };
+}
+
+/**
+ * Integrity and continuity at 30 / 90 / 180 without mutating the selected horizon.
+ * Missing keys in horizonsMap are skipped.
+ * @returns {Array<{ days: number, integrity: number, continuity: number, label: string }>}
+ */
+export function horizonStrip(state, mission, lens, horizonsMap, controlWeights) {
+  const rows = [];
+  for (const days of [30, 90, 180]) {
+    const horizon = horizonsMap?.[days];
+    if (!horizon) continue;
+    rows.push({
+      days,
+      integrity: integrityScore(state, mission, lens, horizon, controlWeights),
+      continuity: continuityScore(state, mission, lens, horizon, controlWeights),
+      label: horizon.label
+    });
+  }
+  return rows;
+}
+
+/**
+ * Nodes linked (undirected) to the first type==="crown" node.
+ * @returns {{ crown: { id: string, label: string } | null, neighbors: Array<{ id: string, label: string }> }}
+ */
+export function crownNeighbors(mission) {
+  const nodes = mission?.nodes ?? [];
+  const links = mission?.links ?? [];
+  const crown = nodes.find((node) => node.type === "crown") ?? null;
+  if (!crown) {
+    return { crown: null, neighbors: [] };
+  }
+
+  const seen = new Set();
+  const neighbors = [];
+  for (const link of links) {
+    const a = link?.[0];
+    const b = link?.[1];
+    let other = null;
+    if (a === crown.id) other = b;
+    else if (b === crown.id) other = a;
+    if (!other || other === crown.id || seen.has(other)) continue;
+    const node = nodes.find((entry) => entry.id === other);
+    if (!node) continue;
+    seen.add(other);
+    neighbors.push({ id: node.id, label: node.label });
+  }
+
+  return { crown: { id: crown.id, label: crown.label }, neighbors };
+}
+
+/**
+ * One-line board sentence. Omits the watch clause when weakest is missing.
+ */
+export function boardBlurb(score, mission, weakest) {
+  const jewel = mission?.crownJewel ?? "";
+  if (weakest?.label) {
+    return `${jewel} at integrity ${score}; watch ${weakest.label}.`;
+  }
+  return `${jewel} at integrity ${score}.`;
+}
+
+/**
+ * Integrity at 30d minus integrity at 180d. Null if either horizon is missing.
+ * @returns {{ at30: number, at180: number, drop: number } | null}
+ */
+export function horizonDrop(state, mission, lens, horizonsMap, controlWeights) {
+  const h30 = horizonsMap?.[30];
+  const h180 = horizonsMap?.[180];
+  if (!h30 || !h180) return null;
+  const at30 = integrityScore(state, mission, lens, h30, controlWeights);
+  const at180 = integrityScore(state, mission, lens, h180, controlWeights);
+  return { at30, at180, drop: at30 - at180 };
+}
+
+/**
+ * Control flip with the largest Δ integrity. Ties keep first key order from `controlDeltas`.
+ * Null when there are no safeguard keys.
+ */
+export function bestFlip(state, mission, lens, horizon, controlWeights) {
+  const { flips } = controlDeltas(state, mission, lens, horizon, controlWeights);
+  if (!flips.length) return null;
+  let best = flips[0];
+  for (let i = 1; i < flips.length; i += 1) {
+    if (flips[i].dIntegrity > best.dIntegrity) best = flips[i];
+  }
+  return best;
+}
+
+/**
  * Up to three defensive posture lines from the passed integrity score and current safeguards.
  * @returns {string[]}
  */

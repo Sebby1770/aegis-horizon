@@ -87,7 +87,16 @@ async function main() {
   await assert(byPath["src/app.js"].includes("controlDeltas"), "app.js must call controlDeltas");
   await assert(byPath["src/app.js"].includes("weakestNode"), "app.js must call weakestNode");
   await assert(byPath["src/app.js"].includes("postureAdvice"), "app.js must call postureAdvice");
+  await assert(byPath["src/app.js"].includes("horizonStrip"), "app.js must call horizonStrip");
+  await assert(byPath["src/app.js"].includes("crownNeighbors"), "app.js must call crownNeighbors");
+  await assert(byPath["src/app.js"].includes("boardBlurb"), "app.js must call boardBlurb");
+  await assert(byPath["src/app.js"].includes("hottestNode"), "app.js must call hottestNode");
+  await assert(byPath["src/app.js"].includes("horizonDrop"), "app.js must call horizonDrop");
+  await assert(byPath["src/app.js"].includes("bestFlip"), "app.js must call bestFlip");
   await assert(byPath["src/app.js"].includes("openGapsModal"), "app.js must open the Gaps panel");
+  await assert(byPath["index.html"].includes('id="horizonStrip"'), "horizon strip required");
+  await assert(byPath["index.html"].includes('id="boardBlurb"'), "board blurb required");
+  await assert(byPath["index.html"].includes('id="horizonDrop"'), "horizon drop required");
 
   // Scoring module
   await assert(byPath["src/app.js"].includes('from "./score.js"'), "app.js must import score module");
@@ -110,6 +119,12 @@ async function main() {
   await assert(byPath["src/score.js"].includes("export function controlDeltas"), "score.js must export controlDeltas");
   await assert(byPath["src/score.js"].includes("export function weakestNode"), "score.js must export weakestNode");
   await assert(byPath["src/score.js"].includes("export function postureAdvice"), "score.js must export postureAdvice");
+  await assert(byPath["src/score.js"].includes("export function horizonStrip"), "score.js must export horizonStrip");
+  await assert(byPath["src/score.js"].includes("export function crownNeighbors"), "score.js must export crownNeighbors");
+  await assert(byPath["src/score.js"].includes("export function boardBlurb"), "score.js must export boardBlurb");
+  await assert(byPath["src/score.js"].includes("export function hottestNode"), "score.js must export hottestNode");
+  await assert(byPath["src/score.js"].includes("export function horizonDrop"), "score.js must export horizonDrop");
+  await assert(byPath["src/score.js"].includes("export function bestFlip"), "score.js must export bestFlip");
   await assert(!/\bdocument\b/.test(byPath["src/score.js"]), "score.js must not use the DOM");
   await assert(!/\bwindow\b/.test(byPath["src/score.js"]), "score.js must not use window");
 
@@ -139,12 +154,16 @@ async function main() {
   await assert(byPath["src/styles.css"].includes(".help-keys"), "help overlay key styles required");
   await assert(byPath["src/styles.css"].includes(".icon-button.is-active"), "active toolbar button styles required");
   await assert(byPath["src/styles.css"].includes(".advice-list"), "advice list styles required");
+  await assert(byPath["src/styles.css"].includes(".horizon-strip"), "horizon strip styles required");
+  await assert(byPath["src/styles.css"].includes(".board-blurb"), "board blurb styles required");
+  await assert(byPath["src/styles.css"].includes(".horizon-drop"), "horizon drop styles required");
+  await assert(byPath["src/styles.css"].includes("is-best-flip"), "best-flip row styles required");
 
   // Package version
   const pkg = JSON.parse(byPath["package.json"]);
-  await assert(pkg.version === "1.4.0", `package.json version should be 1.4.0 (got ${pkg.version})`);
+  await assert(pkg.version === "1.6.0", `package.json version should be 1.6.0 (got ${pkg.version})`);
   await assert(!pkg.dependencies || Object.keys(pkg.dependencies).length === 0, "no runtime npm dependencies allowed");
-  await assert(byPath["CHANGELOG.md"].includes("[1.4.0]"), "CHANGELOG must include 1.4.0");
+  await assert(byPath["CHANGELOG.md"].includes("[1.6.0]"), "CHANGELOG must include 1.6.0");
   await assert(byPath["README.md"].includes("https://sebby1770.github.io/aegis-horizon/"), "README must document Pages URL");
 
   // No remote network calls in app modules (blob/data/local only)
@@ -165,7 +184,7 @@ async function main() {
   await assert(!unsafeHit, `unsafe offensive term found: ${unsafeHit}`);
 
   console.log(
-    `Validated ${requiredFiles.length} files, ${scenarioMatches.length} scenarios, score/rehearsal/csv/sweep/gaps/compare/markdown/heat/help features, v${pkg.version}.`
+    `Validated ${requiredFiles.length} files, ${scenarioMatches.length} scenarios, score/rehearsal/csv/sweep/gaps/compare/markdown/heat/help/horizon/blurb features, v${pkg.version}.`
   );
 }
 
