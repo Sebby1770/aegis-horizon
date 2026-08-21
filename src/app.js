@@ -19,11 +19,15 @@ import {
   packetMarkdown,
   bestFlip,
   boardBlurb,
+  continuityDrop,
   crownNeighbors,
+  dominantPressure,
   hottestNode,
   horizonDrop,
   horizonStrip,
+  isolatedNodes,
   postureAdvice,
+  worstFlip,
   pressureScore as scorePressure,
   pressureSweep,
   recoveryWindow as scoreRecoveryWindow,
@@ -96,6 +100,8 @@ const els = {
   boardBlurb: document.querySelector("#boardBlurb"),
   horizonStrip: document.querySelector("#horizonStrip"),
   horizonDrop: document.querySelector("#horizonDrop"),
+  continuityDrop: document.querySelector("#continuityDrop"),
+  dominantPressure: document.querySelector("#dominantPressure"),
   horizonCaption: document.querySelector("#horizonCaption"),
   decisionLoad: document.querySelector("#decisionLoad"),
   safeguardMetric: document.querySelector("#safeguardMetric"),
@@ -437,7 +443,17 @@ function renderDashboard() {
   if (crown.crown) {
     telemetry.push(neighborLabels ? `neighbors ${neighborLabels}` : "neighbors none");
   }
+  const isolated = isolatedNodes(active);
+  telemetry.push(
+    isolated.length
+      ? `isolated ${isolated.map((node) => node.label).join(", ")}`
+      : "isolated none"
+  );
   els.mapTelemetry.textContent = telemetry.join(" · ");
+  if (els.dominantPressure) {
+    const pressure = dominantPressure(state);
+    els.dominantPressure.textContent = `${pressure.key} ${Math.round(pressure.value)}`;
+  }
 
   els.integrityRing.style.setProperty("--integrity", score);
   els.integrityRing.style.setProperty(
@@ -1481,6 +1497,12 @@ function renderHorizonStrip() {
       ? `30d ${drop.at30} → 180d ${drop.at180} · drop ${drop.drop}`
       : "";
   }
+  const continuity = continuityDrop(state, mission(), lens(), horizonProfiles, controlWeights);
+  if (els.continuityDrop) {
+    els.continuityDrop.textContent = continuity
+      ? `continuity 30d ${continuity.at30} → 180d ${continuity.at180} · drop ${continuity.drop}`
+      : "";
+  }
 }
 
 function closeSweepModal() {
@@ -1545,11 +1567,15 @@ function openSweepModal() {
 function renderGapsTable() {
   const result = controlDeltas(...scoreArgs());
   const best = bestFlip(...scoreArgs());
+  const worst = worstFlip(...scoreArgs());
   const bestLine = best
     ? `Best flip ${best.key} (${best.wouldBe ? "on" : "off"}) ${formatDelta(best.dIntegrity)} integrity.`
     : "No safeguard keys to flip.";
+  const worstLine = worst
+    ? ` Worst flip ${worst.key} (${worst.wouldBe ? "on" : "off"}) ${formatDelta(worst.dIntegrity)}.`
+    : "";
   els.gapsTable.innerHTML = `
-    <p class="muted-copy">Current integrity ${result.currentIntegrity}% · continuity ${result.currentContinuity}%. ${bestLine}</p>
+    <p class="muted-copy">Current integrity ${result.currentIntegrity}% · continuity ${result.currentContinuity}%. ${bestLine}${worstLine}</p>
     <table class="compare-table sweep-table">
       <thead>
         <tr>
@@ -1562,8 +1588,10 @@ function renderGapsTable() {
         ${result.flips
           .map((row) => {
             const isBest = best && row.key === best.key;
+            const isWorst = worst && row.key === worst.key && (!best || worst.key !== best.key);
+            const rowClass = isBest ? "is-best-flip" : isWorst ? "is-worst-flip" : "";
             return `
-              <tr${isBest ? ' class="is-best-flip"' : ""}>
+              <tr${rowClass ? ` class="${rowClass}"` : ""}>
                 <td>${escapeHtml(row.key)}</td>
                 <td>${row.wouldBe ? "true" : "false"}</td>
                 <td class="${deltaClass(row.dIntegrity)}">${formatDelta(row.dIntegrity)}</td>

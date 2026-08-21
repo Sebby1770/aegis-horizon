@@ -93,10 +93,16 @@ async function main() {
   await assert(byPath["src/app.js"].includes("hottestNode"), "app.js must call hottestNode");
   await assert(byPath["src/app.js"].includes("horizonDrop"), "app.js must call horizonDrop");
   await assert(byPath["src/app.js"].includes("bestFlip"), "app.js must call bestFlip");
+  await assert(byPath["src/app.js"].includes("worstFlip"), "app.js must call worstFlip");
+  await assert(byPath["src/app.js"].includes("continuityDrop"), "app.js must call continuityDrop");
+  await assert(byPath["src/app.js"].includes("dominantPressure"), "app.js must call dominantPressure");
+  await assert(byPath["src/app.js"].includes("isolatedNodes"), "app.js must call isolatedNodes");
   await assert(byPath["src/app.js"].includes("openGapsModal"), "app.js must open the Gaps panel");
   await assert(byPath["index.html"].includes('id="horizonStrip"'), "horizon strip required");
   await assert(byPath["index.html"].includes('id="boardBlurb"'), "board blurb required");
   await assert(byPath["index.html"].includes('id="horizonDrop"'), "horizon drop required");
+  await assert(byPath["index.html"].includes('id="continuityDrop"'), "continuity drop required");
+  await assert(byPath["index.html"].includes('id="dominantPressure"'), "dominant pressure required");
 
   // Scoring module
   await assert(byPath["src/app.js"].includes('from "./score.js"'), "app.js must import score module");
@@ -125,6 +131,11 @@ async function main() {
   await assert(byPath["src/score.js"].includes("export function hottestNode"), "score.js must export hottestNode");
   await assert(byPath["src/score.js"].includes("export function horizonDrop"), "score.js must export horizonDrop");
   await assert(byPath["src/score.js"].includes("export function bestFlip"), "score.js must export bestFlip");
+  await assert(byPath["src/score.js"].includes("export function worstFlip"), "score.js must export worstFlip");
+  await assert(byPath["src/score.js"].includes("export function continuityDrop"), "score.js must export continuityDrop");
+  await assert(byPath["src/score.js"].includes("export function dominantPressure"), "score.js must export dominantPressure");
+  await assert(byPath["src/score.js"].includes("export function isolatedNodes"), "score.js must export isolatedNodes");
+  await assert(byPath["src/score.js"].includes("export function nodeDegrees"), "score.js must export nodeDegrees");
   await assert(!/\bdocument\b/.test(byPath["src/score.js"]), "score.js must not use the DOM");
   await assert(!/\bwindow\b/.test(byPath["src/score.js"]), "score.js must not use window");
 
@@ -158,12 +169,13 @@ async function main() {
   await assert(byPath["src/styles.css"].includes(".board-blurb"), "board blurb styles required");
   await assert(byPath["src/styles.css"].includes(".horizon-drop"), "horizon drop styles required");
   await assert(byPath["src/styles.css"].includes("is-best-flip"), "best-flip row styles required");
+  await assert(byPath["src/styles.css"].includes("is-worst-flip"), "worst-flip row styles required");
 
   // Package version
   const pkg = JSON.parse(byPath["package.json"]);
-  await assert(pkg.version === "1.6.0", `package.json version should be 1.6.0 (got ${pkg.version})`);
+  await assert(pkg.version === "1.7.0", `package.json version should be 1.7.0 (got ${pkg.version})`);
   await assert(!pkg.dependencies || Object.keys(pkg.dependencies).length === 0, "no runtime npm dependencies allowed");
-  await assert(byPath["CHANGELOG.md"].includes("[1.6.0]"), "CHANGELOG must include 1.6.0");
+  await assert(byPath["CHANGELOG.md"].includes("[1.7.0]"), "CHANGELOG must include 1.7.0");
   await assert(byPath["README.md"].includes("https://sebby1770.github.io/aegis-horizon/"), "README must document Pages URL");
 
   // No remote network calls in app modules (blob/data/local only)

@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.7.0] — 2026-08-21
+
+### Added
+- Isolated nodes (`isolatedNodes` / `nodeDegrees`) on map telemetry — degree 0, catalog order.
+- Dominant pressure (`dominantPressure`) under the horizon strip — highest of agent / supplier / data; ties keep that order.
+- Continuity drop (`continuityDrop`) under integrity drop — continuity at 30d minus 180d.
+- Worst control flip (`worstFlip`) highlighted in the Gaps table (smallest Δ integrity; first key on ties).
+
+### Changed
+- Package version `1.7.0`.
+
 ## [1.6.0] — 2026-08-21
 
 ### Added

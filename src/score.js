@@ -239,6 +239,82 @@ export function bestFlip(state, mission, lens, horizon, controlWeights) {
 }
 
 /**
+ * Control flip with the smallest Δ integrity. Ties keep first key order from `controlDeltas`.
+ * Null when there are no safeguard keys.
+ */
+export function worstFlip(state, mission, lens, horizon, controlWeights) {
+  const { flips } = controlDeltas(state, mission, lens, horizon, controlWeights);
+  if (!flips.length) return null;
+  let worst = flips[0];
+  for (let i = 1; i < flips.length; i += 1) {
+    if (flips[i].dIntegrity < worst.dIntegrity) worst = flips[i];
+  }
+  return worst;
+}
+
+/**
+ * Continuity at 30d minus continuity at 180d. Null if either horizon is missing.
+ * @returns {{ at30: number, at180: number, drop: number } | null}
+ */
+export function continuityDrop(state, mission, lens, horizonsMap, controlWeights) {
+  const h30 = horizonsMap?.[30];
+  const h180 = horizonsMap?.[180];
+  if (!h30 || !h180) return null;
+  const at30 = continuityScore(state, mission, lens, h30, controlWeights);
+  const at180 = continuityScore(state, mission, lens, h180, controlWeights);
+  return { at30, at180, drop: at30 - at180 };
+}
+
+const PRESSURE_ORDER = ["agent", "supplier", "data"];
+
+/**
+ * Highest pressure axis. Ties keep agent, then supplier, then data.
+ * @returns {{ key: string, value: number }}
+ */
+export function dominantPressure(state) {
+  const pressure = state?.pressure ?? {};
+  let key = PRESSURE_ORDER[0];
+  let value = Number(pressure[key]) || 0;
+  for (let i = 1; i < PRESSURE_ORDER.length; i += 1) {
+    const nextKey = PRESSURE_ORDER[i];
+    const nextValue = Number(pressure[nextKey]) || 0;
+    if (nextValue > value) {
+      key = nextKey;
+      value = nextValue;
+    }
+  }
+  return { key, value };
+}
+
+/**
+ * Undirected degree per node. Self-loops do not increment. Unknown link ends are ignored.
+ * @returns {Array<{ id: string, label: string, degree: number }>}
+ */
+export function nodeDegrees(mission) {
+  const nodes = mission?.nodes ?? [];
+  const links = mission?.links ?? [];
+  const degrees = new Map();
+  for (const node of nodes) {
+    degrees.set(node.id, 0);
+  }
+  for (const link of links) {
+    const a = link?.[0];
+    const b = link?.[1];
+    if (!a || !b || a === b) continue;
+    if (degrees.has(a)) degrees.set(a, degrees.get(a) + 1);
+    if (degrees.has(b)) degrees.set(b, degrees.get(b) + 1);
+  }
+  return nodes.map((node) => ({ id: node.id, label: node.label, degree: degrees.get(node.id) ?? 0 }));
+}
+
+/**
+ * Nodes with degree 0, in catalog order.
+ */
+export function isolatedNodes(mission) {
+  return nodeDegrees(mission).filter((node) => node.degree === 0);
+}
+
+/**
  * Up to three defensive posture lines from the passed integrity score and current safeguards.
  * @returns {string[]}
  */

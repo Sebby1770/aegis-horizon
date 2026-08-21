@@ -5,6 +5,8 @@ import { controlWeights, horizonProfiles, lenses, missions } from "../src/data.j
 import {
   bestFlip,
   boardBlurb,
+  continuityDrop,
+  dominantPressure,
   buildPacketCsv,
   buildPacketCsvRecords,
   compareMissions,
@@ -16,12 +18,15 @@ import {
   hottestNode,
   horizonDrop,
   horizonStrip,
+  isolatedNodes,
+  nodeDegrees,
   integrityScore,
   packetMarkdown,
   postureAdvice,
   pressureSweep,
   serializeCsv,
-  weakestNode
+  weakestNode,
+  worstFlip
 } from "../src/score.js";
 
 const defaultState = {
@@ -391,6 +396,74 @@ describe("bestFlip", () => {
     assert.equal(best.dIntegrity, maxDelta);
     assert.equal(best.key, deltas.flips.find((row) => row.dIntegrity === maxDelta).key);
     assert.equal(bestFlip({ ...defaultState, controls: {} }, ...argsFor().slice(1)), null);
+  });
+});
+
+describe("worstFlip", () => {
+  it("is the controlDeltas flip with the smallest dIntegrity", () => {
+    const deltas = controlDeltas(...argsFor());
+    const worst = worstFlip(...argsFor());
+    const minDelta = Math.min(...deltas.flips.map((row) => row.dIntegrity));
+    assert.equal(worst.dIntegrity, minDelta);
+    assert.equal(worst.key, deltas.flips.find((row) => row.dIntegrity === minDelta).key);
+    assert.equal(worstFlip({ ...defaultState, controls: {} }, ...argsFor().slice(1)), null);
+  });
+});
+
+describe("continuityDrop", () => {
+  it("is 30d continuity minus 180d continuity", () => {
+    const drop = continuityDrop(defaultState, missions.caremesh, lenses.board, horizonProfiles, controlWeights);
+    const at30 = continuityScore(defaultState, missions.caremesh, lenses.board, horizonProfiles[30], controlWeights);
+    const at180 = continuityScore(defaultState, missions.caremesh, lenses.board, horizonProfiles[180], controlWeights);
+    assert.equal(drop.at30, at30);
+    assert.equal(drop.at180, at180);
+    assert.equal(drop.drop, at30 - at180);
+  });
+
+  it("returns null when 30 or 180 is missing", () => {
+    assert.equal(
+      continuityDrop(defaultState, missions.caremesh, lenses.board, { 90: horizonProfiles[90] }, controlWeights),
+      null
+    );
+  });
+});
+
+describe("dominantPressure", () => {
+  it("picks the highest axis and keeps agent-supplier-data ties", () => {
+    assert.deepEqual(dominantPressure(defaultState), { key: "data", value: 61 });
+    assert.deepEqual(
+      dominantPressure({ pressure: { agent: 40, supplier: 40, data: 10 } }),
+      { key: "agent", value: 40 }
+    );
+    assert.deepEqual(dominantPressure({ pressure: {} }), { key: "agent", value: 0 });
+  });
+});
+
+describe("isolatedNodes", () => {
+  it("returns degree-0 nodes in catalog order and ignores self-loops", () => {
+    const water = isolatedNodes(missions.watergrid);
+    assert.deepEqual(water, []);
+    const degrees = nodeDegrees(missions.watergrid);
+    assert.equal(degrees.length, 6);
+    assert.ok(degrees.every((node) => node.degree >= 1));
+
+    const lonely = isolatedNodes({
+      nodes: [
+        { id: "a", label: "A" },
+        { id: "b", label: "B" },
+        { id: "c", label: "C" }
+      ],
+      links: [
+        ["a", "b", "edge"],
+        ["c", "c", "loop"],
+        ["missing", "a", "ghost"]
+      ]
+    });
+    assert.deepEqual(
+      lonely.map((node) => node.id),
+      ["c"]
+    );
+    assert.deepEqual(isolatedNodes({ nodes: [] }), []);
   });
 });
 

@@ -34,6 +34,20 @@ http://127.0.0.1:4173
 
 No install step is required because the app has no runtime dependencies.
 
+## Local UX (v1.7)
+
+### Isolated nodes
+- Map telemetry lists nodes with undirected degree 0 (`isolatedNodes`). Self-loops do not count. Empty catalog yields none.
+
+### Dominant pressure
+- Under the horizon strip, `dominantPressure` names the highest of agent / supplier / data. Ties keep that order.
+
+### Continuity drop
+- Next to integrity drop, `continuityDrop` shows continuity at 30d, 180d, and the difference.
+
+### Worst flip
+- The Gaps panel highlights the safeguard flip with the smallest Δ integrity (`worstFlip`) unless it is also the best flip.
+
 ## Local UX (v1.6)
 
 ### Hottest node
@@ -130,7 +144,7 @@ Policy Forge rules show blue-team technique chips such as Zero Trust, MFA / step
 npm test
 ```
 
-The validation script checks that static app files exist, the mission catalog (including Water Grid) is present, HTML references local assets only, scoring is extracted to `src/score.js`, rehearsal/CSV/sweep/gaps/compare/markdown/heatmap/help/horizon-strip/blurb/drop/hottest/best-flip controls exist, and package version `1.6.0` is set. `node --test tools/score.test.mjs` covers integrity bounds, coverage monotonicity, Water Grid shape, CSV order, pressure sweeps, mission compare, packet markdown, finite control-flip deltas, weakest and hottest Water Grid nodes, recovery posture advice, 30/90/180 horizon strips, horizon drop, crown neighbors, board blurb, and best-flip selection. Live Pages URL: https://sebby1770.github.io/aegis-horizon/
+The validation script checks that static app files exist, the mission catalog (including Water Grid) is present, HTML references local assets only, scoring is extracted to `src/score.js`, rehearsal/CSV/sweep/gaps/compare/markdown/heatmap/help/horizon-strip/blurb/drop/hottest/best-flip/isolated/pressure/continuity/worst-flip controls exist, and package version `1.7.0` is set. `node --test tools/score.test.mjs` covers integrity bounds, coverage monotonicity, Water Grid shape, CSV order, pressure sweeps, mission compare, packet markdown, finite control-flip deltas, weakest and hottest Water Grid nodes, recovery posture advice, 30/90/180 horizon strips, horizon and continuity drop, crown neighbors, board blurb, best/worst flip, isolated nodes, and dominant pressure. Live Pages URL: https://sebby1770.github.io/aegis-horizon/
 
 ## Publish on GitHub Pages
 
