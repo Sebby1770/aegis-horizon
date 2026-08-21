@@ -677,8 +677,52 @@ h2 {
   letter-spacing: 0.04em;
 }
 
+.icon-button.is-active {
+  border-color: rgba(143, 240, 177, 0.9);
+  background: rgba(143, 240, 177, 0.12);
+  color: var(--text);
+}
+
 .icon-button.is-busy span {
   animation: spin 500ms linear infinite;
+}
+
+.help-panel {
+  width: min(420px, 100%);
+}
+
+.help-keys {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 0;
+}
+
+.help-keys > div {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.help-keys dt {
+  display: grid;
+  place-items: center;
+  min-height: 32px;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--cyan);
+  font-weight: 800;
+}
+
+.help-keys dd {
+  margin: 0;
+  color: var(--soft);
+}
+
+.sweep-table {
+  margin-top: 12px;
 }
 
 .stage-grid {

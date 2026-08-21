@@ -7,6 +7,7 @@ import {
   buildPacketCsv,
   buildPolicyRows as scorePolicyRows,
   clamp,
+  compareMissions as scoreCompareMissions,
   continuityScore as scoreContinuity,
   coverage as scoreCoverage,
   decisionHeadline as scoreHeadline,
@@ -14,7 +15,9 @@ import {
   decisionSummary as scoreSummary,
   evidenceReady as scoreEvidenceReady,
   integrityScore as scoreIntegrity,
+  packetMarkdown,
   pressureScore as scorePressure,
+  pressureSweep,
   recoveryWindow as scoreRecoveryWindow,
   signalScore as scoreSignal
 } from "./score.js";
@@ -47,7 +50,8 @@ const state = {
   pulse: 0,
   frameTime: 0,
   lastPacketDigest: null,
-  rehearsalStep: 0
+  rehearsalStep: 0,
+  heat: false
 };
 
 /** In-memory portfolio: { [name]: profilePayload } */
@@ -102,7 +106,12 @@ const els = {
   resetRehearsalButton: document.querySelector("#resetRehearsalButton"),
   exportButton: document.querySelector("#exportButton"),
   csvExportButton: document.querySelector("#csvExportButton"),
+  markdownExportButton: document.querySelector("#markdownExportButton"),
   printReportButton: document.querySelector("#printReportButton"),
+  sweepButton: document.querySelector("#sweepButton"),
+  compareMissionsButton: document.querySelector("#compareMissionsButton"),
+  heatToggle: document.querySelector("#heatToggle"),
+  helpButton: document.querySelector("#helpButton"),
   saveProfileButton: document.querySelector("#saveProfileButton"),
   saveAsProfileButton: document.querySelector("#saveAsProfileButton"),
   exportPortfolioButton: document.querySelector("#exportPortfolioButton"),
@@ -132,7 +141,17 @@ const els = {
   printTimelineList: document.querySelector("#printTimelineList"),
   printEvidenceList: document.querySelector("#printEvidenceList"),
   printGeneratedAt: document.querySelector("#printGeneratedAt"),
-  printDigest: document.querySelector("#printDigest")
+  printDigest: document.querySelector("#printDigest"),
+  sweepModal: document.querySelector("#sweepModal"),
+  closeSweepModal: document.querySelector("#closeSweepModal"),
+  sweepTable: document.querySelector("#sweepTable"),
+  missionCompareModal: document.querySelector("#missionCompareModal"),
+  closeMissionCompareModal: document.querySelector("#closeMissionCompareModal"),
+  missionCompareSelectA: document.querySelector("#missionCompareSelectA"),
+  missionCompareSelectB: document.querySelector("#missionCompareSelectB"),
+  missionCompareResults: document.querySelector("#missionCompareResults"),
+  helpOverlay: document.querySelector("#helpOverlay"),
+  closeHelpOverlay: document.querySelector("#closeHelpOverlay")
 };
 
 const twinCtx = els.twinCanvas.getContext("2d");
@@ -411,6 +430,8 @@ function renderDashboard() {
   renderSignals();
   renderEvidence();
   drawContinuity();
+  if (!els.sweepModal.hidden) renderSweepTable();
+  if (!els.missionCompareModal.hidden) renderMissionCompare();
 }
 
 function resizeCanvas(canvas, ctx) {
@@ -481,6 +502,14 @@ function drawNodeShape(ctx, node, x, y, radius) {
   }
   ctx.beginPath();
   ctx.arc(x, y, radius, 0, Math.PI * 2);
+}
+
+function nodeHeatColor(weight, alpha = 1) {
+  const t = clamp(Number(weight) || 0, 0, 1);
+  const r = Math.round(143 + (255 - 143) * t);
+  const g = Math.round(240 + (191 - 240) * t);
+  const b = Math.round(177 + (90 - 177) * t);
+  return alpha === 1 ? `rgb(${r}, ${g}, ${b})` : `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 function drawTwin(timestamp = 0) {
@@ -571,12 +600,12 @@ function drawTwin(timestamp = 0) {
   nodes.forEach((node, index) => {
     const nodeScore = clamp(node.weight * 100 + pressureScore() * 0.18 - coverage() * 0.08, 5, 98);
     const radius = 19 + node.weight * 17 + Math.sin(pulse * 0.035 + index) * 1.8;
-    const color = typeColor[node.type] ?? colors.cyan;
+    const color = state.heat ? nodeHeatColor(node.weight) : (typeColor[node.type] ?? colors.cyan);
 
     twinCtx.save();
     twinCtx.shadowColor = color;
     twinCtx.shadowBlur = node.type === "crown" ? 24 : 14;
-    twinCtx.fillStyle = colors.panel;
+    twinCtx.fillStyle = state.heat ? nodeHeatColor(node.weight, 0.22) : colors.panel;
     twinCtx.strokeStyle = color;
     twinCtx.lineWidth = node.type === "crown" ? 3 : 2;
     drawNodeShape(twinCtx, node, node.px, node.py, radius);
@@ -1205,6 +1234,7 @@ function renderCompareResults() {
 }
 
 function openCompareModal() {
+  closeOverlays();
   fillCompareSelects();
   renderCompareResults();
   els.compareModal.hidden = false;
@@ -1326,7 +1356,7 @@ async function preparePrintReport() {
     })
     .join("");
 
-  els.printGeneratedAt.textContent = `Generated ${new Date().toLocaleString()} · Aegis Horizon 1.2 · Local-first defensive twin`;
+  els.printGeneratedAt.textContent = `Generated ${new Date().toLocaleString()} · Aegis Horizon 1.3 · Local-first defensive twin`;
   els.printDigest.textContent =
     digest && digest !== "unavailable"
       ? `SHA-256 packet digest: ${digest}`
@@ -1378,6 +1408,173 @@ function exportPacketCsv() {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+function exportPacketMarkdown() {
+  const markdown = packetMarkdown(integrityScore(), ...scoreArgs());
+  const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `aegis-horizon-${mission().code.toLowerCase()}-packet.md`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function overlayOpen(el) {
+  return Boolean(el) && !el.hidden;
+}
+
+function closeSweepModal() {
+  els.sweepModal.hidden = true;
+}
+
+function closeMissionCompareModal() {
+  els.missionCompareModal.hidden = true;
+}
+
+function closeHelpOverlay() {
+  els.helpOverlay.hidden = true;
+}
+
+function closeOverlays() {
+  closeCompareModal();
+  closeSweepModal();
+  closeMissionCompareModal();
+  closeHelpOverlay();
+}
+
+function renderSweepTable() {
+  const samples = pressureSweep(...scoreArgs(), { key: "agent", steps: 9 });
+  els.sweepTable.innerHTML = `
+    <table class="compare-table sweep-table">
+      <thead>
+        <tr>
+          <th>Agent pressure</th>
+          <th>Integrity</th>
+          <th>Continuity</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${samples
+          .map((row) => {
+            return `
+              <tr>
+                <td>${Math.round(row.pressure)}</td>
+                <td>${row.integrity}</td>
+                <td>${row.continuity}</td>
+              </tr>
+            `;
+          })
+          .join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function openSweepModal() {
+  closeOverlays();
+  renderSweepTable();
+  els.sweepModal.hidden = false;
+  els.closeSweepModal.focus();
+}
+
+function missionOptionMarkup() {
+  return Object.entries(missions)
+    .map(([id, item]) => {
+      return `<option value="${escapeHtml(id)}">${escapeHtml(id)} — ${escapeHtml(item.label)}</option>`;
+    })
+    .join("");
+}
+
+function fillMissionCompareSelects() {
+  const markup = missionOptionMarkup();
+  const previousA = els.missionCompareSelectA.value;
+  const previousB = els.missionCompareSelectB.value;
+  els.missionCompareSelectA.innerHTML = markup;
+  els.missionCompareSelectB.innerHTML = markup;
+
+  const ids = Object.keys(missions);
+  const idA = missions[previousA] ? previousA : state.mission;
+  const fallbackB = ids.find((id) => id !== idA) ?? idA;
+  const idB = missions[previousB] && previousB !== idA ? previousB : fallbackB;
+
+  els.missionCompareSelectA.value = idA;
+  els.missionCompareSelectB.value = idB;
+}
+
+function renderMissionCompare() {
+  const idA = els.missionCompareSelectA.value;
+  const idB = els.missionCompareSelectB.value;
+  if (!missions[idA] || !missions[idB]) {
+    els.missionCompareResults.innerHTML = `<p class="muted-copy">Pick two missions to score at the current pressure and safeguards.</p>`;
+    return;
+  }
+
+  const result = scoreCompareMissions(state, missions, lens(), horizon(), controlWeights, idA, idB);
+  const labelA = missions[result.a.id]?.label ?? result.a.id;
+  const labelB = missions[result.b.id]?.label ?? result.b.id;
+
+  els.missionCompareResults.innerHTML = `
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th></th>
+          <th>A · ${escapeHtml(labelA)}</th>
+          <th>B · ${escapeHtml(labelB)}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th>Id</th>
+          <td>${escapeHtml(result.a.id)}</td>
+          <td>${escapeHtml(result.b.id)}</td>
+        </tr>
+        <tr>
+          <th>Integrity</th>
+          <td>${result.a.integrity}%</td>
+          <td>${result.b.integrity}%</td>
+        </tr>
+        <tr>
+          <th>Continuity</th>
+          <td>${result.a.continuity}%</td>
+          <td>${result.b.continuity}%</td>
+        </tr>
+        <tr>
+          <th>Coverage</th>
+          <td>${result.a.coverage}%</td>
+          <td>${result.b.coverage}%</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="muted-copy">Same pressure and safeguards; only the mission catalog entry is swapped.</p>
+  `;
+}
+
+function openMissionCompareModal() {
+  closeOverlays();
+  fillMissionCompareSelects();
+  renderMissionCompare();
+  els.missionCompareModal.hidden = false;
+  els.closeMissionCompareModal.focus();
+}
+
+function openHelpOverlay() {
+  closeOverlays();
+  els.helpOverlay.hidden = false;
+  els.closeHelpOverlay.focus();
+}
+
+function syncHeatToggle() {
+  els.heatToggle.classList.toggle("is-active", state.heat);
+  els.heatToggle.setAttribute("aria-pressed", String(state.heat));
+}
+
+function toggleHeat() {
+  state.heat = !state.heat;
+  syncHeatToggle();
 }
 
 function bindEvents() {
@@ -1434,7 +1631,12 @@ function bindEvents() {
   els.resetRehearsalButton.addEventListener("click", resetRehearsal);
   els.exportButton.addEventListener("click", () => void exportPacket());
   els.csvExportButton.addEventListener("click", exportPacketCsv);
+  els.markdownExportButton.addEventListener("click", exportPacketMarkdown);
   els.printReportButton.addEventListener("click", () => void printReport());
+  els.sweepButton.addEventListener("click", openSweepModal);
+  els.compareMissionsButton.addEventListener("click", openMissionCompareModal);
+  els.heatToggle.addEventListener("click", toggleHeat);
+  els.helpButton.addEventListener("click", openHelpOverlay);
 
   els.timelineList.addEventListener("click", (event) => {
     const item = event.target.closest("[data-beat]");
@@ -1475,17 +1677,61 @@ function bindEvents() {
   els.compareSelectA.addEventListener("change", renderCompareResults);
   els.compareSelectB.addEventListener("change", renderCompareResults);
 
+  els.closeSweepModal.addEventListener("click", closeSweepModal);
+  els.sweepModal.addEventListener("click", (event) => {
+    if (event.target === els.sweepModal) closeSweepModal();
+  });
+  els.closeMissionCompareModal.addEventListener("click", closeMissionCompareModal);
+  els.missionCompareModal.addEventListener("click", (event) => {
+    if (event.target === els.missionCompareModal) closeMissionCompareModal();
+  });
+  els.missionCompareSelectA.addEventListener("change", renderMissionCompare);
+  els.missionCompareSelectB.addEventListener("change", renderMissionCompare);
+  els.closeHelpOverlay.addEventListener("click", closeHelpOverlay);
+  els.helpOverlay.addEventListener("click", (event) => {
+    if (event.target === els.helpOverlay) closeHelpOverlay();
+  });
+
   els.snapshotList.addEventListener("click", (event) => {
     const delBtn = event.target.closest("[data-snapshot-delete]");
     if (delBtn) deleteSnapshot(delBtn.dataset.snapshotDelete);
   });
 
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !els.compareModal.hidden) {
-      closeCompareModal();
+    if (event.key === "Escape") {
+      if (
+        overlayOpen(els.compareModal) ||
+        overlayOpen(els.sweepModal) ||
+        overlayOpen(els.missionCompareModal) ||
+        overlayOpen(els.helpOverlay)
+      ) {
+        closeOverlays();
+      }
       return;
     }
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
     if (event.target instanceof Element && event.target.closest("input, textarea, select, [contenteditable='true']")) return;
+    if (event.key === "?") {
+      event.preventDefault();
+      if (overlayOpen(els.helpOverlay)) closeHelpOverlay();
+      else openHelpOverlay();
+      return;
+    }
+    if (event.key === "r" || event.key === "R") {
+      event.preventDefault();
+      startRehearsal();
+      return;
+    }
+    if (event.key === "n" || event.key === "N") {
+      event.preventDefault();
+      nextRehearsalBeat();
+      return;
+    }
+    if (event.key === "0") {
+      event.preventDefault();
+      resetRehearsal();
+      return;
+    }
     if (event.key === "]") {
       event.preventDefault();
       nextRehearsalBeat();
@@ -1514,6 +1760,7 @@ renderMissionButtons();
 els.profileNameInput.value = state.activeProfileName;
 updateControlsFromState();
 bindEvents();
+syncHeatToggle();
 renderProfileList();
 renderSnapshotList();
 renderDashboard();

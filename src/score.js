@@ -215,3 +215,86 @@ export function buildPacketCsvRecords(score, state, mission, lens, horizon, cont
 export function buildPacketCsv(score, state, mission, lens, horizon, controlWeights) {
   return serializeCsv(buildPacketCsvRecords(score, state, mission, lens, horizon, controlWeights));
 }
+
+const PRESSURE_KEYS = new Set(["agent", "supplier", "data"]);
+
+function cloneTwinState(state) {
+  return {
+    ...state,
+    pressure: { ...(state.pressure ?? {}) },
+    controls: { ...(state.controls ?? {}) }
+  };
+}
+
+/**
+ * Sample integrity/continuity while sweeping one pressure axis from 0 to 100 inclusive.
+ * Does not mutate the caller's state.
+ * @returns {Array<{ pressure: number, integrity: number, continuity: number }>}
+ */
+export function pressureSweep(state, mission, lens, horizon, controlWeights, options = {}) {
+  const key = PRESSURE_KEYS.has(options.key) ? options.key : "agent";
+  const requested = Number(options.steps);
+  const steps = Number.isFinite(requested) && requested >= 2 ? Math.round(requested) : 9;
+  const cloned = cloneTwinState(state);
+  const samples = [];
+
+  for (let i = 0; i < steps; i += 1) {
+    const pressure = (i / (steps - 1)) * 100;
+    cloned.pressure[key] = pressure;
+    samples.push({
+      pressure,
+      integrity: integrityScore(cloned, mission, lens, horizon, controlWeights),
+      continuity: continuityScore(cloned, mission, lens, horizon, controlWeights)
+    });
+  }
+
+  return samples;
+}
+
+/**
+ * Score two catalog missions with the same pressure and safeguards.
+ * @returns {{ a: { id: string, integrity: number, continuity: number, coverage: number }, b: { id: string, integrity: number, continuity: number, coverage: number } }}
+ */
+export function compareMissions(state, missions, lens, horizon, controlWeights, idA, idB) {
+  const side = (id) => {
+    const entry = missions[id];
+    return {
+      id,
+      integrity: integrityScore(state, entry, lens, horizon, controlWeights),
+      continuity: continuityScore(state, entry, lens, horizon, controlWeights),
+      coverage: coverage(state, entry, lens, horizon, controlWeights)
+    };
+  };
+
+  return { a: side(idA), b: side(idB) };
+}
+
+/**
+ * Small defensive packet as markdown. No secrets, profiles, or digests.
+ */
+export function packetMarkdown(score, state, mission, lens, horizon, controlWeights) {
+  const continuity = continuityScore(state, mission, lens, horizon, controlWeights);
+  const rows = buildPolicyRows(score, state, mission, lens, horizon, controlWeights);
+  const policies = rows.map((row) => `- ${row.rule}`).join("\n");
+  const timeline = mission.timeline.map(([time, action]) => `- ${time} ${action}`).join("\n");
+  const evidence = mission.evidence.map((item) => `- ${item}`).join("\n");
+
+  return [
+    `# ${mission.title}`,
+    "",
+    `Crown jewel: ${mission.crownJewel}`,
+    "",
+    `Integrity: ${score}`,
+    `Continuity: ${continuity}`,
+    "",
+    "## Policies",
+    policies,
+    "",
+    "## Timeline",
+    timeline,
+    "",
+    "## Evidence",
+    evidence,
+    ""
+  ].join("\n");
+}

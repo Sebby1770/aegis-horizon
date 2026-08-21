@@ -34,6 +34,25 @@ http://127.0.0.1:4173
 
 No install step is required because the app has no runtime dependencies.
 
+## Local UX (v1.3)
+
+### Pressure sweep
+- Toolbar **Sweep** opens a text table of integrity and continuity as agent authority moves from 0 to 100. Other sliders and safeguards stay put. No chart library.
+
+### Mission compare
+- Toolbar **Compare** picks two mission ids and scores integrity / continuity / coverage at the current pressure and safeguards.
+
+### Packet markdown
+- Toolbar **MD** downloads a small markdown packet: title, crown jewel, integrity/continuity, policies, timeline, and evidence. No secrets or digests.
+
+### Node heatmap
+- Toolbar **Heat** colors twin nodes by existing `node.weight` on a green → amber scale. Off keeps the usual type colors.
+
+### Keyboard
+- `R` / `N` / `0` rehearsal (start / next / reset).
+- `[` / `]` previous / next beat.
+- `?` help overlay. `Esc` closes overlays.
+
 ## Local UX (v1.2)
 
 ### Tabletop rehearsal
@@ -78,7 +97,7 @@ Policy Forge rules show blue-team technique chips such as Zero Trust, MFA / step
 npm test
 ```
 
-The validation script checks that static app files exist, the mission catalog (including Water Grid) is present, HTML references local assets only, scoring is extracted to `src/score.js`, rehearsal/CSV controls exist, and package version `1.2.0` is set. `node --test tools/score.test.mjs` covers integrity bounds, coverage monotonicity, Water Grid shape, and CSV order.
+The validation script checks that static app files exist, the mission catalog (including Water Grid) is present, HTML references local assets only, scoring is extracted to `src/score.js`, rehearsal/CSV/sweep/compare/markdown/heatmap/help controls exist, and package version `1.3.0` is set. `node --test tools/score.test.mjs` covers integrity bounds, coverage monotonicity, Water Grid shape, CSV order, pressure sweeps, mission compare, and packet markdown.
 
 ## Publish on GitHub Pages
 
@@ -116,6 +135,7 @@ Live URL: [https://sebby1770.github.io/aegis-horizon/](https://sebby1770.github.
 - [x] Extract scoring for DOM-free tests.
 - [x] Add municipal water SCADA continuity mission.
 - [x] Add tabletop rehearsal stepper and CSV packet export.
+- [x] Add pressure sweep, mission compare, packet markdown, heatmap, and keyboard help.
 - [ ] Add optional WebCrypto signing for exported policy packets (beyond SHA-256 digests).
 
 ## Safety boundary

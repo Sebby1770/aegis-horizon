@@ -5,9 +5,13 @@ import { controlWeights, horizonProfiles, lenses, missions } from "../src/data.j
 import {
   buildPacketCsv,
   buildPacketCsvRecords,
+  compareMissions,
+  continuityScore,
   coverage,
   csvEscape,
   integrityScore,
+  packetMarkdown,
+  pressureSweep,
   serializeCsv
 } from "../src/score.js";
 
@@ -131,5 +135,82 @@ describe("CSV helper", () => {
     assert.match(waterCsv, /\ntechniques,/);
     assert.match(waterCsv, /\ntimeline,/);
     assert.match(waterCsv, /\nevidence,/);
+  });
+});
+
+describe("pressureSweep", () => {
+  it("samples 0..100 inclusive with finite, monotonic-ish scores", () => {
+    const agentBefore = defaultState.pressure.agent;
+    const samples = pressureSweep(...argsFor(), { key: "agent", steps: 9 });
+
+    assert.equal(samples.length, 9);
+    assert.equal(samples[0].pressure, 0);
+    assert.equal(samples.at(-1).pressure, 100);
+    assert.equal(defaultState.pressure.agent, agentBefore);
+
+    for (let i = 0; i < samples.length; i += 1) {
+      const row = samples[i];
+      assert.equal(Number.isFinite(row.pressure), true);
+      assert.equal(Number.isFinite(row.integrity), true);
+      assert.equal(Number.isFinite(row.continuity), true);
+      if (i > 0) {
+        assert.ok(row.pressure > samples[i - 1].pressure);
+        assert.ok(row.integrity <= samples[i - 1].integrity);
+        assert.ok(row.continuity <= samples[i - 1].continuity);
+      }
+    }
+  });
+
+  it("defaults to nine agent-pressure samples", () => {
+    const samples = pressureSweep(...argsFor());
+    assert.equal(samples.length, 9);
+    assert.equal(samples[0].pressure, 0);
+    assert.equal(samples.at(-1).pressure, 100);
+  });
+});
+
+describe("compareMissions", () => {
+  it("scores two known missions with the same pressure and controls", () => {
+    const result = compareMissions(
+      defaultState,
+      missions,
+      lenses[defaultState.lens],
+      horizonProfiles[defaultState.horizon],
+      controlWeights,
+      "caremesh",
+      "watergrid"
+    );
+
+    assert.equal(result.a.id, "caremesh");
+    assert.equal(result.b.id, "watergrid");
+    assert.equal(result.a.coverage, result.b.coverage);
+    assert.equal(result.a.coverage, coverage(...argsFor()));
+    assert.equal(result.a.integrity, integrityScore(...argsFor(defaultState, "caremesh")));
+    assert.equal(result.b.integrity, integrityScore(...argsFor({ ...defaultState, mission: "watergrid" }, "watergrid")));
+    assert.equal(result.a.continuity, continuityScore(...argsFor(defaultState, "caremesh")));
+    assert.equal(result.b.continuity, continuityScore(...argsFor({ ...defaultState, mission: "watergrid" }, "watergrid")));
+    assert.ok(result.a.integrity !== result.b.integrity);
+  });
+});
+
+describe("packetMarkdown", () => {
+  it("includes the crown jewel and packet sections without secrets", () => {
+    const score = integrityScore(...argsFor());
+    const markdown = packetMarkdown(score, ...argsFor());
+
+    assert.match(markdown, /^# /);
+    assert.match(markdown, /Patient continuity ledger/);
+    assert.match(markdown, /## Policies/);
+    assert.match(markdown, /## Timeline/);
+    assert.match(markdown, /## Evidence/);
+    assert.match(markdown, new RegExp(`Integrity: ${score}`));
+    assert.doesNotMatch(markdown, /localStorage|password|token|secret|integrityDigest/i);
+
+    const waterState = { ...defaultState, mission: "watergrid" };
+    const waterMarkdown = packetMarkdown(
+      integrityScore(...argsFor(waterState, "watergrid")),
+      ...argsFor(waterState, "watergrid")
+    );
+    assert.match(waterMarkdown, /Potable water authority/);
   });
 });

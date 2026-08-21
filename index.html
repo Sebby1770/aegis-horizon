@@ -205,8 +205,25 @@
                 <button class="icon-button is-wide" id="csvExportButton" type="button" aria-label="Export policy packet CSV" title="Export CSV">
                   <span aria-hidden="true">CSV</span>
                 </button>
+                <button class="icon-button is-wide" id="markdownExportButton" type="button" aria-label="Download packet markdown" title="Download markdown">
+                  <span aria-hidden="true">MD</span>
+                </button>
                 <button class="icon-button" id="printReportButton" type="button" aria-label="Print board-level risk report" title="Print report">
                   <span aria-hidden="true">P</span>
+                </button>
+              </div>
+              <div class="toolbar-group" role="group" aria-label="Analysis">
+                <button class="icon-button is-wide" id="sweepButton" type="button" aria-label="Agent pressure sweep" title="Agent pressure sweep">
+                  <span aria-hidden="true">Sweep</span>
+                </button>
+                <button class="icon-button is-wide" id="compareMissionsButton" type="button" aria-label="Compare missions" title="Compare missions at current sliders">
+                  <span aria-hidden="true">Compare</span>
+                </button>
+                <button class="icon-button is-wide" id="heatToggle" type="button" aria-label="Node weight heatmap" title="Color nodes by weight" aria-pressed="false">
+                  <span aria-hidden="true">Heat</span>
+                </button>
+                <button class="icon-button" id="helpButton" type="button" aria-label="Keyboard help" title="Help (?)">
+                  <span aria-hidden="true">?</span>
                 </button>
               </div>
             </div>
@@ -308,6 +325,84 @@
           <div class="compare-results" id="compareResults">
             <p class="muted-copy">Select two snapshots to see integrity, continuity, and pressure deltas.</p>
           </div>
+        </div>
+      </div>
+
+      <div class="modal-backdrop" id="sweepModal" hidden>
+        <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="sweepModalTitle">
+          <div class="modal-header">
+            <h2 id="sweepModalTitle">Agent pressure sweep</h2>
+            <button class="icon-button" id="closeSweepModal" type="button" aria-label="Close sweep dialog" title="Close">
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
+          <p class="muted-copy">Integrity and continuity as agent authority moves from 0 to 100. Other sliders and safeguards stay put.</p>
+          <div id="sweepTable"></div>
+        </div>
+      </div>
+
+      <div class="modal-backdrop" id="missionCompareModal" hidden>
+        <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="missionCompareTitle">
+          <div class="modal-header">
+            <h2 id="missionCompareTitle">Compare missions</h2>
+            <button class="icon-button" id="closeMissionCompareModal" type="button" aria-label="Close mission compare dialog" title="Close">
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
+          <div class="compare-pickers">
+            <label class="field-row">
+              <span>Mission A</span>
+              <select id="missionCompareSelectA"></select>
+            </label>
+            <label class="field-row">
+              <span>Mission B</span>
+              <select id="missionCompareSelectB"></select>
+            </label>
+          </div>
+          <div class="compare-results" id="missionCompareResults">
+            <p class="muted-copy">Pick two missions to score at the current pressure and safeguards.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-backdrop" id="helpOverlay" hidden>
+        <div class="modal-panel help-panel" role="dialog" aria-modal="true" aria-labelledby="helpOverlayTitle">
+          <div class="modal-header">
+            <h2 id="helpOverlayTitle">Keyboard</h2>
+            <button class="icon-button" id="closeHelpOverlay" type="button" aria-label="Close help" title="Close">
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
+          <dl class="help-keys">
+            <div>
+              <dt>R</dt>
+              <dd>Rehearse from first beat</dd>
+            </div>
+            <div>
+              <dt>N</dt>
+              <dd>Next rehearsal beat</dd>
+            </div>
+            <div>
+              <dt>0</dt>
+              <dd>Reset rehearsal</dd>
+            </div>
+            <div>
+              <dt>[</dt>
+              <dd>Previous beat</dd>
+            </div>
+            <div>
+              <dt>]</dt>
+              <dd>Next beat</dd>
+            </div>
+            <div>
+              <dt>?</dt>
+              <dd>Help</dd>
+            </div>
+            <div>
+              <dt>Esc</dt>
+              <dd>Close overlay</dd>
+            </div>
+          </dl>
         </div>
       </div>
 

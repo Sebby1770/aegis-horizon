@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.3.0] — 2026-08-21
+
+### Added
+- Pressure sweep helper (`pressureSweep`) and toolbar **Sweep** table for agent authority 0–100.
+- Mission compare helper (`compareMissions`) and toolbar **Compare** selects scored at current sliders.
+- Packet markdown (`packetMarkdown`) and toolbar **MD** download (title, scores, policies, timeline, evidence; no secrets).
+- Keyboard help overlay (`?`, Escape closes). Rehearsal keys R / N / 0 plus `[` / `]`.
+- Canvas node heatmap toggle (**Heat**) coloring twins by `node.weight` on a green/amber scale.
+
+### Changed
+- Package version `1.3.0`.
+
 ## [1.2.0] — 2026-08-21
 
 ### Added

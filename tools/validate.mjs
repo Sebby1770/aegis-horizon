@@ -56,8 +56,30 @@ async function main() {
   await assert(byPath["src/app.js"].includes("rehearsalStep"), "app.js must track rehearsalStep");
   await assert(byPath["src/app.js"].includes("nextRehearsalBeat"), "app.js must advance rehearsal beats");
   await assert(byPath["src/app.js"].includes("exportPacketCsv"), "app.js must export CSV packets");
+  await assert(byPath["src/app.js"].includes("exportPacketMarkdown"), "app.js must export markdown packets");
   await assert(byPath["src/app.js"].includes('event.key === "]"'), "app.js must bind ] for next beat");
   await assert(byPath["src/app.js"].includes('event.key === "["'), "app.js must bind [ for previous beat");
+  await assert(byPath["src/app.js"].includes('event.key === "?"'), "app.js must bind ? for help");
+  await assert(byPath["src/app.js"].includes('event.key === "r"'), "app.js must bind R for rehearsal");
+  await assert(byPath["src/app.js"].includes('event.key === "n"'), "app.js must bind N for next beat");
+  await assert(byPath["src/app.js"].includes('event.key === "0"'), "app.js must bind 0 for reset rehearsal");
+
+  // Sweep / mission compare / markdown / heatmap / help
+  await assert(byPath["index.html"].includes('id="sweepButton"'), "sweep button required");
+  await assert(byPath["index.html"].includes('id="sweepModal"'), "sweep modal required");
+  await assert(byPath["index.html"].includes('id="sweepTable"'), "sweep table required");
+  await assert(byPath["index.html"].includes('id="compareMissionsButton"'), "compare missions button required");
+  await assert(byPath["index.html"].includes('id="missionCompareModal"'), "mission compare modal required");
+  await assert(byPath["index.html"].includes('id="missionCompareSelectA"'), "mission compare select A required");
+  await assert(byPath["index.html"].includes('id="missionCompareSelectB"'), "mission compare select B required");
+  await assert(byPath["index.html"].includes('id="markdownExportButton"'), "markdown export button required");
+  await assert(byPath["index.html"].includes('id="heatToggle"'), "heat toggle required");
+  await assert(byPath["index.html"].includes('id="helpOverlay"'), "help overlay required");
+  await assert(byPath["index.html"].includes('id="helpButton"'), "help button required");
+  await assert(byPath["src/app.js"].includes("state.heat"), "app.js must track heat flag");
+  await assert(byPath["src/app.js"].includes("pressureSweep"), "app.js must call pressureSweep");
+  await assert(byPath["src/app.js"].includes("packetMarkdown"), "app.js must call packetMarkdown");
+  await assert(byPath["src/app.js"].includes("nodeHeatColor"), "app.js must color nodes for heatmap");
 
   // Scoring module
   await assert(byPath["src/app.js"].includes('from "./score.js"'), "app.js must import score module");
@@ -74,6 +96,9 @@ async function main() {
   await assert(byPath["src/score.js"].includes("export function decisionSummary"), "score.js must export decisionSummary");
   await assert(byPath["src/score.js"].includes("export function buildPolicyRows"), "score.js must export buildPolicyRows");
   await assert(byPath["src/score.js"].includes("export function buildPacketCsv"), "score.js must export buildPacketCsv");
+  await assert(byPath["src/score.js"].includes("export function pressureSweep"), "score.js must export pressureSweep");
+  await assert(byPath["src/score.js"].includes("export function compareMissions"), "score.js must export compareMissions");
+  await assert(byPath["src/score.js"].includes("export function packetMarkdown"), "score.js must export packetMarkdown");
   await assert(!/\bdocument\b/.test(byPath["src/score.js"]), "score.js must not use the DOM");
   await assert(!/\bwindow\b/.test(byPath["src/score.js"]), "score.js must not use window");
 
@@ -100,12 +125,14 @@ async function main() {
   await assert(byPath["src/styles.css"].includes(".technique-chip"), "technique chip styles required");
   await assert(byPath["src/styles.css"].includes("is-printing"), "is-printing body class styles required");
   await assert(byPath["src/styles.css"].includes(".timeline-list li.is-active"), "active timeline beat styles required");
+  await assert(byPath["src/styles.css"].includes(".help-keys"), "help overlay key styles required");
+  await assert(byPath["src/styles.css"].includes(".icon-button.is-active"), "active toolbar button styles required");
 
   // Package version
   const pkg = JSON.parse(byPath["package.json"]);
-  await assert(pkg.version === "1.2.0", `package.json version should be 1.2.0 (got ${pkg.version})`);
+  await assert(pkg.version === "1.3.0", `package.json version should be 1.3.0 (got ${pkg.version})`);
   await assert(!pkg.dependencies || Object.keys(pkg.dependencies).length === 0, "no runtime npm dependencies allowed");
-  await assert(byPath["CHANGELOG.md"].includes("[1.2.0]"), "CHANGELOG must include 1.2.0");
+  await assert(byPath["CHANGELOG.md"].includes("[1.3.0]"), "CHANGELOG must include 1.3.0");
   await assert(byPath["README.md"].includes("https://sebby1770.github.io/aegis-horizon/"), "README must document Pages URL");
 
   // No remote network calls in app modules (blob/data/local only)
@@ -126,7 +153,7 @@ async function main() {
   await assert(!unsafeHit, `unsafe offensive term found: ${unsafeHit}`);
 
   console.log(
-    `Validated ${requiredFiles.length} files, ${scenarioMatches.length} scenarios, score/rehearsal/csv/watergrid features, v${pkg.version}.`
+    `Validated ${requiredFiles.length} files, ${scenarioMatches.length} scenarios, score/rehearsal/csv/sweep/compare/markdown/heat/help features, v${pkg.version}.`
   );
 }
 
