@@ -34,6 +34,17 @@ http://127.0.0.1:4173
 
 No install step is required because the app has no runtime dependencies.
 
+## Local UX (v1.4)
+
+### Control gaps
+- Toolbar **Gaps** opens a dock-side panel of `controlDeltas`: each safeguard key, the flipped `wouldBe` state, and Δ integrity versus the current twin.
+
+### Weakest node
+- Map telemetry on the canvas overlay includes the lowest-weight node label (`weakestNode`; first node wins ties).
+
+### Posture advice
+- Up to three defensive bullets under the decision summary (`postureAdvice`): restore named-owner approvals, stand up an offline recovery owner, and pause new autonomy when integrity is below 55.
+
 ## Local UX (v1.3)
 
 ### Pressure sweep
@@ -97,7 +108,7 @@ Policy Forge rules show blue-team technique chips such as Zero Trust, MFA / step
 npm test
 ```
 
-The validation script checks that static app files exist, the mission catalog (including Water Grid) is present, HTML references local assets only, scoring is extracted to `src/score.js`, rehearsal/CSV/sweep/compare/markdown/heatmap/help controls exist, and package version `1.3.0` is set. `node --test tools/score.test.mjs` covers integrity bounds, coverage monotonicity, Water Grid shape, CSV order, pressure sweeps, mission compare, and packet markdown.
+The validation script checks that static app files exist, the mission catalog (including Water Grid) is present, HTML references local assets only, scoring is extracted to `src/score.js`, rehearsal/CSV/sweep/gaps/compare/markdown/heatmap/help controls exist, and package version `1.4.0` is set. `node --test tools/score.test.mjs` covers integrity bounds, coverage monotonicity, Water Grid shape, CSV order, pressure sweeps, mission compare, packet markdown, finite control-flip deltas, weakest Water Grid node, and recovery posture advice.
 
 ## Publish on GitHub Pages
 
@@ -136,6 +147,7 @@ Live URL: [https://sebby1770.github.io/aegis-horizon/](https://sebby1770.github.
 - [x] Add municipal water SCADA continuity mission.
 - [x] Add tabletop rehearsal stepper and CSV packet export.
 - [x] Add pressure sweep, mission compare, packet markdown, heatmap, and keyboard help.
+- [x] Add control-gap deltas, weakest-node telemetry, and defensive posture advice.
 - [ ] Add optional WebCrypto signing for exported policy packets (beyond SHA-256 digests).
 
 ## Safety boundary

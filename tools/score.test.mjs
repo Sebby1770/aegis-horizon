@@ -7,12 +7,15 @@ import {
   buildPacketCsvRecords,
   compareMissions,
   continuityScore,
+  controlDeltas,
   coverage,
   csvEscape,
   integrityScore,
   packetMarkdown,
+  postureAdvice,
   pressureSweep,
-  serializeCsv
+  serializeCsv,
+  weakestNode
 } from "../src/score.js";
 
 const defaultState = {
@@ -190,6 +193,72 @@ describe("compareMissions", () => {
     assert.equal(result.a.continuity, continuityScore(...argsFor(defaultState, "caremesh")));
     assert.equal(result.b.continuity, continuityScore(...argsFor({ ...defaultState, mission: "watergrid" }, "watergrid")));
     assert.ok(result.a.integrity !== result.b.integrity);
+  });
+});
+
+describe("controlDeltas", () => {
+  it("returns finite flip deltas without mutating state", () => {
+    const recoveryBefore = defaultState.controls.recovery;
+    const result = controlDeltas(...argsFor());
+
+    assert.equal(Number.isFinite(result.currentIntegrity), true);
+    assert.equal(Number.isFinite(result.currentContinuity), true);
+    assert.equal(result.currentIntegrity, integrityScore(...argsFor()));
+    assert.equal(result.currentContinuity, continuityScore(...argsFor()));
+    assert.ok(Array.isArray(result.flips));
+    assert.equal(result.flips.length, Object.keys(defaultState.controls).length);
+
+    for (const flip of result.flips) {
+      assert.equal(typeof flip.key, "string");
+      assert.equal(flip.wouldBe, !defaultState.controls[flip.key]);
+      assert.equal(Number.isFinite(flip.integrity), true);
+      assert.equal(Number.isFinite(flip.continuity), true);
+      assert.equal(Number.isFinite(flip.dIntegrity), true);
+      assert.equal(Number.isFinite(flip.dContinuity), true);
+      assert.equal(flip.dIntegrity, flip.integrity - result.currentIntegrity);
+      assert.equal(flip.dContinuity, flip.continuity - result.currentContinuity);
+    }
+
+    assert.equal(defaultState.controls.recovery, recoveryBefore);
+  });
+});
+
+describe("weakestNode", () => {
+  it("returns the lowest-weight watergrid node, first on ties", () => {
+    const node = weakestNode(missions.watergrid);
+    assert.equal(node.id, "offline-dose");
+    assert.equal(node.label, "Offline Dose");
+    assert.equal(node.weight, 0.51);
+
+    const tied = {
+      nodes: [
+        { id: "first", label: "First", weight: 0.4 },
+        { id: "second", label: "Second", weight: 0.4 }
+      ]
+    };
+    assert.equal(weakestNode(tied).id, "first");
+  });
+});
+
+describe("postureAdvice", () => {
+  it("includes recovery guidance when recovery is false", () => {
+    const state = {
+      ...defaultState,
+      controls: { ...defaultState.controls, recovery: false }
+    };
+    const advice = postureAdvice(70, state);
+    assert.ok(advice.includes("Stand up an offline recovery owner"));
+    assert.ok(advice.length <= 3);
+  });
+
+  it("uses the passed integrity score for the autonomy pause", () => {
+    const allOn = {
+      ...defaultState,
+      controls: { approvals: true, recovery: true, attestation: true, privacy: true }
+    };
+    assert.ok(postureAdvice(54, allOn).includes("Pause new autonomy until safeguards return"));
+    assert.equal(postureAdvice(55, allOn).includes("Pause new autonomy until safeguards return"), false);
+    assert.ok(postureAdvice(80, { ...allOn, controls: { ...allOn.controls, approvals: false } }).includes("Restore named-owner approvals"));
   });
 });
 

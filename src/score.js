@@ -119,6 +119,40 @@ export function decisionSummary(score, _state, mission, lens, horizon, _controlW
 }
 
 /**
+ * Lowest-weight twin node. Ties keep the first node in the array.
+ * @returns {{ id: string, label: string, weight: number } | null}
+ */
+export function weakestNode(mission) {
+  const nodes = mission?.nodes ?? [];
+  if (!nodes.length) return null;
+
+  let weakest = nodes[0];
+  for (let i = 1; i < nodes.length; i += 1) {
+    if (nodes[i].weight < weakest.weight) weakest = nodes[i];
+  }
+
+  return { id: weakest.id, label: weakest.label, weight: weakest.weight };
+}
+
+/**
+ * Up to three defensive posture lines from the passed integrity score and current safeguards.
+ * @returns {string[]}
+ */
+export function postureAdvice(score, state) {
+  const advice = [];
+  if (!state?.controls?.approvals) {
+    advice.push("Restore named-owner approvals");
+  }
+  if (!state?.controls?.recovery) {
+    advice.push("Stand up an offline recovery owner");
+  }
+  if (score < 55) {
+    advice.push("Pause new autonomy until safeguards return");
+  }
+  return advice.slice(0, 3);
+}
+
+/**
  * Build policy rules with defensive technique tags.
  * @returns {Array<{ rule: string, techniques: string[], source: "generated"|"mission" }>}
  */
@@ -249,6 +283,36 @@ export function pressureSweep(state, mission, lens, horizon, controlWeights, opt
   }
 
   return samples;
+}
+
+/**
+ * Score each safeguard flipped one at a time. Does not mutate the caller's state.
+ * @returns {{
+ *   currentIntegrity: number,
+ *   currentContinuity: number,
+ *   flips: Array<{ key: string, wouldBe: boolean, integrity: number, continuity: number, dIntegrity: number, dContinuity: number }>
+ * }}
+ */
+export function controlDeltas(state, mission, lens, horizon, controlWeights) {
+  const currentIntegrity = integrityScore(state, mission, lens, horizon, controlWeights);
+  const currentContinuity = continuityScore(state, mission, lens, horizon, controlWeights);
+  const flips = Object.keys(state.controls ?? {}).map((key) => {
+    const cloned = cloneTwinState(state);
+    const wouldBe = !cloned.controls[key];
+    cloned.controls[key] = wouldBe;
+    const integrity = integrityScore(cloned, mission, lens, horizon, controlWeights);
+    const continuity = continuityScore(cloned, mission, lens, horizon, controlWeights);
+    return {
+      key,
+      wouldBe,
+      integrity,
+      continuity,
+      dIntegrity: integrity - currentIntegrity,
+      dContinuity: continuity - currentContinuity
+    };
+  });
+
+  return { currentIntegrity, currentContinuity, flips };
 }
 
 /**

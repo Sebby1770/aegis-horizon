@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.4.0] — 2026-08-21
+
+### Added
+- Control flip deltas (`controlDeltas`) and toolbar **Gaps** panel listing each safeguard key, would-be state, and Δ integrity.
+- Weakest node (`weakestNode`) on map telemetry (lowest `weight`; first node on ties).
+- Posture advice (`postureAdvice`) under the decision summary — at most three defensive bullets.
+
+### Changed
+- Package version `1.4.0`.
+
 ## [1.3.0] — 2026-08-21
 
 ### Added

@@ -814,6 +814,19 @@ h2 {
   line-height: 1.5;
 }
 
+.advice-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 1.15rem;
+  color: var(--amber);
+  line-height: 1.42;
+}
+
+.advice-list:empty {
+  display: none;
+}
+
 .decision-copy small {
   line-height: 1.35;
 }

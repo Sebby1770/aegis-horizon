@@ -9,6 +9,7 @@ import {
   clamp,
   compareMissions as scoreCompareMissions,
   continuityScore as scoreContinuity,
+  controlDeltas,
   coverage as scoreCoverage,
   decisionHeadline as scoreHeadline,
   decisionLoad as scoreDecisionLoad,
@@ -16,10 +17,12 @@ import {
   evidenceReady as scoreEvidenceReady,
   integrityScore as scoreIntegrity,
   packetMarkdown,
+  postureAdvice,
   pressureScore as scorePressure,
   pressureSweep,
   recoveryWindow as scoreRecoveryWindow,
-  signalScore as scoreSignal
+  signalScore as scoreSignal,
+  weakestNode
 } from "./score.js";
 
 /** Legacy single-profile key (migrated on first load). */
@@ -83,6 +86,7 @@ const els = {
   integrityScore: document.querySelector("#integrityScore"),
   decisionHeadline: document.querySelector("#decisionHeadline"),
   decisionSummary: document.querySelector("#decisionSummary"),
+  adviceList: document.querySelector("#adviceList"),
   horizonCaption: document.querySelector("#horizonCaption"),
   decisionLoad: document.querySelector("#decisionLoad"),
   safeguardMetric: document.querySelector("#safeguardMetric"),
@@ -109,6 +113,7 @@ const els = {
   markdownExportButton: document.querySelector("#markdownExportButton"),
   printReportButton: document.querySelector("#printReportButton"),
   sweepButton: document.querySelector("#sweepButton"),
+  gapsButton: document.querySelector("#gapsButton"),
   compareMissionsButton: document.querySelector("#compareMissionsButton"),
   heatToggle: document.querySelector("#heatToggle"),
   helpButton: document.querySelector("#helpButton"),
@@ -145,6 +150,9 @@ const els = {
   sweepModal: document.querySelector("#sweepModal"),
   closeSweepModal: document.querySelector("#closeSweepModal"),
   sweepTable: document.querySelector("#sweepTable"),
+  gapsModal: document.querySelector("#gapsModal"),
+  closeGapsModal: document.querySelector("#closeGapsModal"),
+  gapsTable: document.querySelector("#gapsTable"),
   missionCompareModal: document.querySelector("#missionCompareModal"),
   closeMissionCompareModal: document.querySelector("#closeMissionCompareModal"),
   missionCompareSelectA: document.querySelector("#missionCompareSelectA"),
@@ -410,7 +418,10 @@ function renderDashboard() {
   els.continuityStatus.textContent = `${continuity}%`;
   els.crownLabel.textContent = active.crownJewel;
   els.promiseLabel.textContent = active.promise;
-  els.mapTelemetry.textContent = `${active.nodes.length} assets, ${active.links.length} trust paths`;
+  const weak = weakestNode(active);
+  els.mapTelemetry.textContent = weak
+    ? `${active.nodes.length} assets, ${active.links.length} trust paths · weakest ${weak.label}`
+    : `${active.nodes.length} assets, ${active.links.length} trust paths`;
 
   els.integrityRing.style.setProperty("--integrity", score);
   els.integrityRing.style.setProperty(
@@ -420,6 +431,7 @@ function renderDashboard() {
   els.integrityScore.textContent = String(score);
   els.decisionHeadline.textContent = decisionHeadline(score);
   els.decisionSummary.textContent = decisionSummary(score);
+  renderAdvice(score);
   els.horizonCaption.textContent = `${horizon().caption} via ${lens().caption.toLowerCase()}`;
   els.decisionLoad.textContent = `${decisionLoad()} moves`;
   els.safeguardMetric.textContent = `${cover}%`;
@@ -431,6 +443,7 @@ function renderDashboard() {
   renderEvidence();
   drawContinuity();
   if (!els.sweepModal.hidden) renderSweepTable();
+  if (!els.gapsModal.hidden) renderGapsTable();
   if (!els.missionCompareModal.hidden) renderMissionCompare();
 }
 
@@ -1427,8 +1440,17 @@ function overlayOpen(el) {
   return Boolean(el) && !el.hidden;
 }
 
+function renderAdvice(score) {
+  const items = postureAdvice(score, state);
+  els.adviceList.innerHTML = items.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+}
+
 function closeSweepModal() {
   els.sweepModal.hidden = true;
+}
+
+function closeGapsModal() {
+  els.gapsModal.hidden = true;
 }
 
 function closeMissionCompareModal() {
@@ -1442,6 +1464,7 @@ function closeHelpOverlay() {
 function closeOverlays() {
   closeCompareModal();
   closeSweepModal();
+  closeGapsModal();
   closeMissionCompareModal();
   closeHelpOverlay();
 }
@@ -1479,6 +1502,42 @@ function openSweepModal() {
   renderSweepTable();
   els.sweepModal.hidden = false;
   els.closeSweepModal.focus();
+}
+
+function renderGapsTable() {
+  const result = controlDeltas(...scoreArgs());
+  els.gapsTable.innerHTML = `
+    <p class="muted-copy">Current integrity ${result.currentIntegrity}% · continuity ${result.currentContinuity}%.</p>
+    <table class="compare-table sweep-table">
+      <thead>
+        <tr>
+          <th>key</th>
+          <th>wouldBe</th>
+          <th>dIntegrity</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${result.flips
+          .map((row) => {
+            return `
+              <tr>
+                <td>${escapeHtml(row.key)}</td>
+                <td>${row.wouldBe ? "true" : "false"}</td>
+                <td class="${deltaClass(row.dIntegrity)}">${formatDelta(row.dIntegrity)}</td>
+              </tr>
+            `;
+          })
+          .join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function openGapsModal() {
+  closeOverlays();
+  renderGapsTable();
+  els.gapsModal.hidden = false;
+  els.closeGapsModal.focus();
 }
 
 function missionOptionMarkup() {
@@ -1634,6 +1693,7 @@ function bindEvents() {
   els.markdownExportButton.addEventListener("click", exportPacketMarkdown);
   els.printReportButton.addEventListener("click", () => void printReport());
   els.sweepButton.addEventListener("click", openSweepModal);
+  els.gapsButton.addEventListener("click", openGapsModal);
   els.compareMissionsButton.addEventListener("click", openMissionCompareModal);
   els.heatToggle.addEventListener("click", toggleHeat);
   els.helpButton.addEventListener("click", openHelpOverlay);
@@ -1681,6 +1741,10 @@ function bindEvents() {
   els.sweepModal.addEventListener("click", (event) => {
     if (event.target === els.sweepModal) closeSweepModal();
   });
+  els.closeGapsModal.addEventListener("click", closeGapsModal);
+  els.gapsModal.addEventListener("click", (event) => {
+    if (event.target === els.gapsModal) closeGapsModal();
+  });
   els.closeMissionCompareModal.addEventListener("click", closeMissionCompareModal);
   els.missionCompareModal.addEventListener("click", (event) => {
     if (event.target === els.missionCompareModal) closeMissionCompareModal();
@@ -1702,6 +1766,7 @@ function bindEvents() {
       if (
         overlayOpen(els.compareModal) ||
         overlayOpen(els.sweepModal) ||
+        overlayOpen(els.gapsModal) ||
         overlayOpen(els.missionCompareModal) ||
         overlayOpen(els.helpOverlay)
       ) {
