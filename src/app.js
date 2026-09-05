@@ -479,6 +479,8 @@ function renderDashboard() {
   if (!els.sweepModal.hidden) renderSweepTable();
   if (!els.gapsModal.hidden) renderGapsTable();
   if (!els.missionCompareModal.hidden) renderMissionCompare();
+  // With animation paused the loop is not there to pick the change up.
+  if (!twinFrame) drawTwin();
 }
 
 function resizeCanvas(canvas, ctx) {
@@ -559,13 +561,7 @@ function nodeHeatColor(weight, alpha = 1) {
   return alpha === 1 ? `rgb(${r}, ${g}, ${b})` : `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-function drawTwin(timestamp = 0) {
-  if (timestamp - state.frameTime < 32) {
-    requestAnimationFrame(drawTwin);
-    return;
-  }
-  state.frameTime = timestamp;
-
+function drawTwin() {
   const rect = resizeCanvas(els.twinCanvas, twinCtx);
   const width = rect.width;
   const height = rect.height;
@@ -600,6 +596,11 @@ function drawTwin(timestamp = 0) {
   active.links.forEach(([fromId, toId, label], index) => {
     const from = nodeById(nodes, fromId);
     const to = nodeById(nodes, toId);
+    // A link naming a node that no longer exists used to throw here, which
+    // killed the animation frame and froze the twin for the rest of the
+    // session. tools/validate.mjs now fails on such a link; this keeps a stale
+    // catalog from taking the whole map down.
+    if (!from || !to) return;
     const activity = (Math.sin(pulse * 0.038 + index * 0.9) + 1) / 2;
     const heat = clamp((pressureScore() / 100 + (from.weight + to.weight) / 2) / 2, 0, 1);
     const linkColor = heat > 0.7 ? colors.red : heat > 0.56 ? colors.amber : colors.cyan;
@@ -678,8 +679,49 @@ function drawTwin(timestamp = 0) {
     twinCtx.restore();
   });
 
-  state.pulse += 1;
-  requestAnimationFrame(drawTwin);
+}
+
+const reducedMotion =
+  typeof window.matchMedia === "function"
+    ? window.matchMedia("(prefers-reduced-motion: reduce)")
+    : null;
+
+let twinFrame = 0;
+
+function twinShouldAnimate() {
+  return !document.hidden && !reducedMotion?.matches;
+}
+
+function twinLoop(timestamp) {
+  if (timestamp - state.frameTime >= 32) {
+    state.frameTime = timestamp;
+    state.pulse += 1;
+    drawTwin();
+  }
+  twinFrame = requestAnimationFrame(twinLoop);
+}
+
+function startTwin() {
+  if (twinFrame) return;
+  // A hidden tab still burned a full animation loop, and the map animates
+  // continuously, which is exactly what prefers-reduced-motion asks us not to
+  // do. Both cases render one static frame instead.
+  if (!twinShouldAnimate()) {
+    drawTwin();
+    return;
+  }
+  twinFrame = requestAnimationFrame(twinLoop);
+}
+
+function stopTwin() {
+  if (!twinFrame) return;
+  cancelAnimationFrame(twinFrame);
+  twinFrame = 0;
+}
+
+function syncTwinMotion() {
+  stopTwin();
+  startTwin();
 }
 
 function drawContinuity() {
@@ -1886,6 +1928,8 @@ function bindEvents() {
   });
 
   window.addEventListener("resize", drawContinuity);
+  document.addEventListener("visibilitychange", syncTwinMotion);
+  reducedMotion?.addEventListener?.("change", syncTwinMotion);
 }
 
 /* ─── Boot ────────────────────────────────────────────────────────── */
@@ -1900,4 +1944,4 @@ syncHeatToggle();
 renderProfileList();
 renderSnapshotList();
 renderDashboard();
-drawTwin();
+startTwin();

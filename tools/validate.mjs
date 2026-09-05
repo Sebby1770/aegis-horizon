@@ -1,5 +1,7 @@
 import { readFile } from "node:fs/promises";
 
+import { controlWeights, horizonProfiles, lenses, missions } from "../src/data.js";
+
 const requiredFiles = [
   "index.html",
   "src/app.js",
@@ -18,6 +20,58 @@ const requiredFiles = [
 async function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
+  }
+}
+
+async function validateMissionGraphs() {
+  for (const [key, mission] of Object.entries(missions)) {
+    const ids = new Set(mission.nodes.map((node) => node.id));
+
+    await assert(mission.nodes.length > 0, `${key} has no nodes`);
+    await assert(ids.size === mission.nodes.length, `${key} has duplicate node ids`);
+
+    for (const node of mission.nodes) {
+      // Coordinates are drawn as fractions of the canvas, so anything outside
+      // 0..1 renders off-screen.
+      await assert(
+        node.x >= 0 && node.x <= 1 && node.y >= 0 && node.y <= 1,
+        `${key} node ${node.id} sits outside the canvas (x ${node.x}, y ${node.y})`
+      );
+      await assert(
+        node.weight >= 0 && node.weight <= 1,
+        `${key} node ${node.id} has an out-of-range weight (${node.weight})`
+      );
+      await assert(Boolean(node.label), `${key} node ${node.id} has no label`);
+    }
+
+    for (const [fromId, toId, label] of mission.links) {
+      // A link naming a node that does not exist threw inside the animation
+      // frame, which froze the twin map for the rest of the session.
+      await assert(ids.has(fromId), `${key} link "${label}" starts at unknown node ${fromId}`);
+      await assert(ids.has(toId), `${key} link "${label}" ends at unknown node ${toId}`);
+    }
+
+    await assert(mission.timeline.length > 0, `${key} has an empty tabletop timeline`);
+    await assert(mission.evidence.length > 0, `${key} has no evidence items`);
+    await assert(mission.signals.length > 0, `${key} has no futures signals`);
+    await assert(Boolean(mission.crownJewel), `${key} names no crown jewel`);
+  }
+}
+
+async function validateCatalogs() {
+  await assert(Object.keys(lenses).length > 0, "lens catalog must not be empty");
+  await assert(Object.keys(horizonProfiles).length > 0, "horizon catalog must not be empty");
+
+  for (const [key, weight] of Object.entries(controlWeights)) {
+    await assert(
+      Number.isFinite(weight) && weight > 0,
+      `control weight ${key} must be a positive number`
+    );
+  }
+
+  for (const [key, profile] of Object.entries(horizonProfiles)) {
+    await assert(Number.isFinite(profile.drift), `horizon ${key} has a non-numeric drift`);
+    await assert(Number.isFinite(profile.maturity), `horizon ${key} has a non-numeric maturity`);
   }
 }
 
@@ -194,6 +248,10 @@ async function main() {
   const combined = scannedPaths.map((path) => byPath[path]).join("\n").toLowerCase();
   const unsafeHit = unsafeTerms.find((term) => combined.includes(term));
   await assert(!unsafeHit, `unsafe offensive term found: ${unsafeHit}`);
+
+  await validateMissionGraphs();
+  await validateCatalogs();
+
 
   console.log(
     `Validated ${requiredFiles.length} files, ${scenarioMatches.length} scenarios, score/rehearsal/csv/sweep/gaps/compare/markdown/heat/help/horizon/blurb features, v${pkg.version}.`
