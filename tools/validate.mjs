@@ -248,9 +248,9 @@ async function main() {
 
   // Package version
   const pkg = JSON.parse(byPath["package.json"]);
-  await assert(pkg.version === "1.7.0", `package.json version should be 1.7.0 (got ${pkg.version})`);
+  await assert(pkg.version === "1.8.0", `package.json version should be 1.8.0 (got ${pkg.version})`);
   await assert(!pkg.dependencies || Object.keys(pkg.dependencies).length === 0, "no runtime npm dependencies allowed");
-  await assert(byPath["CHANGELOG.md"].includes("[1.7.0]"), "CHANGELOG must include 1.7.0");
+  await assert(byPath["CHANGELOG.md"].includes("[1.8.0]"), "CHANGELOG must include 1.8.0");
   await assert(byPath["README.md"].includes("https://sebby1770.github.io/aegis-horizon/"), "README must document Pages URL");
 
   // No remote network calls in app modules (blob/data/local only)
