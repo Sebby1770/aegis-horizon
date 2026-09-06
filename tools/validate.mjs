@@ -1,10 +1,12 @@
 import { readFile } from "node:fs/promises";
 
 import { controlWeights, horizonProfiles, lenses, missions } from "../src/data.js";
+import { decodeScenario, encodeScenario } from "../src/share.js";
 
 const requiredFiles = [
   "index.html",
   "src/app.js",
+  "src/share.js",
   "src/data.js",
   "src/score.js",
   "src/techniques.js",
@@ -21,6 +23,25 @@ async function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
   }
+}
+
+async function validateShareRoundTrip() {
+  // A scenario link is the one artefact that leaves the machine, so a broken
+  // round trip must fail the build rather than surface as a bad link later.
+  const posture = {
+    mission: Object.keys(missions)[0],
+    lens: Object.keys(lenses)[0],
+    horizon: Number(Object.keys(horizonProfiles)[0]),
+    pressure: { agent: 52, supplier: 44, data: 61 },
+    controls: { approvals: true, recovery: false, attestation: true, privacy: false }
+  };
+  const catalogs = { missions, lenses, horizons: horizonProfiles };
+  const decoded = decodeScenario(encodeScenario(posture), catalogs);
+  await assert(Boolean(decoded.scenario), "scenario token must decode");
+  await assert(
+    JSON.stringify(decoded.scenario) === JSON.stringify(posture),
+    "scenario token must round-trip unchanged"
+  );
 }
 
 async function validateMissionGraphs() {
@@ -248,6 +269,16 @@ async function main() {
   const combined = scannedPaths.map((path) => byPath[path]).join("\n").toLowerCase();
   const unsafeHit = unsafeTerms.find((term) => combined.includes(term));
   await assert(!unsafeHit, `unsafe offensive term found: ${unsafeHit}`);
+
+  await assert(
+    byPath["src/share.js"].includes("export function encodeScenario"),
+    "share.js must export encodeScenario"
+  );
+  await assert(
+    byPath["src/share.js"].includes("export function decodeScenario"),
+    "share.js must export decodeScenario"
+  );
+  await validateShareRoundTrip();
 
   await validateMissionGraphs();
   await validateCatalogs();

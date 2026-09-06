@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.8.0] — 2026-09-06
+
+### Added
+- **Shareable scenario links** (`src/share.js`). A rehearsal posture — mission, lens, horizon, pressures and safeguards — encodes to a short readable token (`1.caremesh.board.90.52-44-61.1101`) carried in the URL fragment, so it can be pasted into a ticket or a chat. The Share button copies the link, falling back to the address bar where the clipboard is unavailable, and a link pasted into an already-open tab is picked up too.
+- `validate.mjs` fails the build if a scenario token does not round-trip.
+
+### Changed
+- The twin map no longer animates while the tab is hidden or when `prefers-reduced-motion` is set; it renders a single static frame that still repaints on state changes.
+- Structural mission-graph validation: link endpoints must resolve, node coordinates must sit inside the canvas, weights must be in range.
+
+### Fixed
+- A link naming a missing node threw inside the animation frame and froze the twin map for the rest of the session.
+
 ## [1.7.0] — 2026-08-21
 
 ### Added

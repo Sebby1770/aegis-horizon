@@ -1,4 +1,5 @@
 import { controlWeights, horizonProfiles, lenses, missions } from "./data.js";
+import { readScenarioFromUrl, scenarioUrl } from "./share.js";
 import {
   techniqueCatalog,
   techniqueCoverage
@@ -132,6 +133,7 @@ const els = {
   compareMissionsButton: document.querySelector("#compareMissionsButton"),
   heatToggle: document.querySelector("#heatToggle"),
   helpButton: document.querySelector("#helpButton"),
+  shareScenarioButton: document.querySelector("#shareScenarioButton"),
   saveProfileButton: document.querySelector("#saveProfileButton"),
   saveAsProfileButton: document.querySelector("#saveAsProfileButton"),
   exportPortfolioButton: document.querySelector("#exportPortfolioButton"),
@@ -769,6 +771,56 @@ function drawContinuity() {
 }
 
 /* ─── Profile / portfolio ─────────────────────────────────────────── */
+
+/** Applies a decoded scenario to live state and redraws everything. */
+function applyScenario(scenario) {
+  state.mission = scenario.mission;
+  state.lens = scenario.lens;
+  state.horizon = scenario.horizon;
+  state.pressure = { ...scenario.pressure };
+  state.controls = { ...scenario.controls };
+  renderMissionButtons();
+  updateControlsFromState();
+  renderDashboard();
+}
+
+async function shareScenario() {
+  const url = scenarioUrl(state, window.location.href);
+  try {
+    await navigator.clipboard.writeText(url);
+    markProfileState("Link copied");
+  } catch {
+    // Clipboard access needs a secure context and permission; falling back to
+    // the address bar still gives the reader something to copy by hand.
+    window.location.hash = new URL(url).hash;
+    markProfileState("Link in URL");
+  }
+}
+
+/**
+ * Loads a posture handed over in the URL fragment.
+ *
+ * The fragment is cleared afterwards so a reload does not keep resurrecting the
+ * shared posture over whatever the reader has since changed.
+ */
+function loadScenarioFromUrl() {
+  const result = readScenarioFromUrl(window.location.href, {
+    missions,
+    lenses,
+    horizons: horizonProfiles
+  });
+  if (!result) return;
+
+  if (result.scenario) {
+    applyScenario(result.scenario);
+    markProfileState("Shared");
+  } else {
+    markProfileState("Bad link");
+    console.warn(`Aegis Horizon: ${result.message}`);
+  }
+
+  window.history.replaceState(null, "", window.location.pathname + window.location.search);
+}
 
 function markProfileState(label) {
   els.profileState.textContent = label;
@@ -1927,6 +1979,10 @@ function bindEvents() {
     document.body.classList.remove("is-printing");
   });
 
+  els.shareScenarioButton?.addEventListener("click", () => void shareScenario());
+  // Pasting a scenario link into an already-open tab is a fragment-only
+  // navigation, which does not reload the page — pick it up here too.
+  window.addEventListener("hashchange", loadScenarioFromUrl);
   window.addEventListener("resize", drawContinuity);
   document.addEventListener("visibilitychange", syncTwinMotion);
   reducedMotion?.addEventListener?.("change", syncTwinMotion);
@@ -1944,4 +2000,5 @@ syncHeatToggle();
 renderProfileList();
 renderSnapshotList();
 renderDashboard();
+loadScenarioFromUrl();
 startTwin();
