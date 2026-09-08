@@ -7,6 +7,7 @@ const requiredFiles = [
   "index.html",
   "src/app.js",
   "src/share.js",
+  "src/sanitize.js",
   "src/data.js",
   "src/score.js",
   "src/techniques.js",
@@ -248,9 +249,9 @@ async function main() {
 
   // Package version
   const pkg = JSON.parse(byPath["package.json"]);
-  await assert(pkg.version === "1.8.0", `package.json version should be 1.8.0 (got ${pkg.version})`);
+  await assert(pkg.version === "1.8.1", `package.json version should be 1.8.1 (got ${pkg.version})`);
   await assert(!pkg.dependencies || Object.keys(pkg.dependencies).length === 0, "no runtime npm dependencies allowed");
-  await assert(byPath["CHANGELOG.md"].includes("[1.8.0]"), "CHANGELOG must include 1.8.0");
+  await assert(byPath["CHANGELOG.md"].includes("[1.8.1]"), "CHANGELOG must include 1.8.1");
   await assert(byPath["README.md"].includes("https://sebby1770.github.io/aegis-horizon/"), "README must document Pages URL");
 
   // No remote network calls in app modules (blob/data/local only)
@@ -277,6 +278,14 @@ async function main() {
   await assert(
     byPath["src/share.js"].includes("export function decodeScenario"),
     "share.js must export decodeScenario"
+  );
+  await assert(
+    byPath["src/sanitize.js"].includes("export function sanitizeSnapshotList"),
+    "sanitize.js must export sanitizeSnapshotList"
+  );
+  await assert(
+    !/\$\{(?:snap|a|b)\.(?:integrity|continuity|coverage|decisionLoad)\}/.test(byPath["src/app.js"]),
+    "snapshot metrics must go through num() before reaching innerHTML"
   );
   await validateShareRoundTrip();
 

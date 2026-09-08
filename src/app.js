@@ -1,5 +1,6 @@
 import { controlWeights, horizonProfiles, lenses, missions } from "./data.js";
 import { readScenarioFromUrl, scenarioUrl } from "./share.js";
+import { sanitizeSnapshotList } from "./sanitize.js";
 import {
   techniqueCatalog,
   techniqueCoverage
@@ -287,6 +288,18 @@ function sanitizeName(raw, fallback = DEFAULT_PROFILE_NAME) {
     .replace(/\s+/g, " ")
     .slice(0, 48);
   return cleaned || fallback;
+}
+
+/**
+ * Coerces a value that must render as a number.
+ *
+ * Snapshot metrics are interpolated into innerHTML without escaping. They are
+ * sanitised on the way in, but a template that assumes "this is a number"
+ * should say so at the point it matters too.
+ */
+function num(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
 }
 
 function setPressed(buttons, activeValue, dataName) {
@@ -1125,23 +1138,13 @@ function importPortfolioFile(file) {
       }
 
       if (Array.isArray(data.snapshots)) {
-        snapshots = data.snapshots
-          .filter((snap) => snap && snap.name && typeof snap.integrity === "number")
-          .map((snap) => ({
-            id: snap.id || `snap-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-            name: sanitizeName(snap.name, "Snapshot"),
-            capturedAt: snap.capturedAt ?? new Date().toISOString(),
-            mission: snap.mission,
-            missionTitle: snap.missionTitle,
-            lens: snap.lens,
-            horizon: snap.horizon,
-            integrity: snap.integrity,
-            continuity: snap.continuity,
-            decisionLoad: snap.decisionLoad,
-            coverage: snap.coverage,
-            pressure: snap.pressure ?? { agent: 0, supplier: 0, data: 0 },
-            controls: snap.controls ?? {}
-          }));
+        // Same boundary check as the localStorage path: an imported file is no
+        // more trustworthy than a stored one.
+        snapshots = sanitizeSnapshotList(data.snapshots, catalogs()).map((snap) => ({
+          ...snap,
+          name: sanitizeName(snap.name, "Snapshot"),
+          capturedAt: snap.capturedAt || new Date().toISOString()
+        }));
         persistSnapshots();
         renderSnapshotList();
       }
@@ -1178,11 +1181,15 @@ function loadSnapshotsFromStorage() {
       snapshots = [];
       return;
     }
-    const data = JSON.parse(stored);
-    snapshots = Array.isArray(data) ? data : [];
+    snapshots = sanitizeSnapshotList(JSON.parse(stored), catalogs());
   } catch {
     snapshots = [];
   }
+}
+
+/** The catalogs a restored snapshot is allowed to reference. */
+function catalogs() {
+  return { missions, lenses, horizons: horizonProfiles };
 }
 
 function captureSnapshot() {
@@ -1235,7 +1242,7 @@ function renderSnapshotList() {
         <li class="snapshot-item" data-snapshot-id="${escapeHtml(snap.id)}">
           <div class="profile-item-meta">
             <strong>${escapeHtml(snap.name)}</strong>
-            <small>I ${snap.integrity}% · C ${snap.continuity}% · ${escapeHtml(when)}</small>
+            <small>I ${num(snap.integrity)}% · C ${num(snap.continuity)}% · ${escapeHtml(when)}</small>
           </div>
           <div class="profile-item-actions">
             <button type="button" data-snapshot-delete="${escapeHtml(snap.id)}" title="Delete snapshot">Del</button>
@@ -1253,7 +1260,7 @@ function fillCompareSelects() {
       : snapshots
           .map(
             (snap) =>
-              `<option value="${escapeHtml(snap.id)}">${escapeHtml(snap.name)} (${snap.integrity}/${snap.continuity})</option>`
+              `<option value="${escapeHtml(snap.id)}">${escapeHtml(snap.name)} (${num(snap.integrity)}/${num(snap.continuity)})</option>`
           )
           .join("");
   const prevA = els.compareSelectA.value;
@@ -1317,26 +1324,26 @@ function renderCompareResults() {
       <tbody>
         <tr>
           <td>Integrity</td>
-          <td>${a.integrity}%</td>
-          <td>${b.integrity}%</td>
+          <td>${num(a.integrity)}%</td>
+          <td>${num(b.integrity)}%</td>
           <td class="${deltaClass(dIntegrity)}">${formatDelta(dIntegrity, "%")}</td>
         </tr>
         <tr>
           <td>Continuity</td>
-          <td>${a.continuity}%</td>
-          <td>${b.continuity}%</td>
+          <td>${num(a.continuity)}%</td>
+          <td>${num(b.continuity)}%</td>
           <td class="${deltaClass(dContinuity)}">${formatDelta(dContinuity, "%")}</td>
         </tr>
         <tr>
           <td>Decision load</td>
-          <td>${a.decisionLoad}</td>
-          <td>${b.decisionLoad}</td>
+          <td>${num(a.decisionLoad)}</td>
+          <td>${num(b.decisionLoad)}</td>
           <td class="${deltaClass(-dLoad)}">${formatDelta(dLoad)}</td>
         </tr>
         <tr>
           <td>Safeguards</td>
-          <td>${a.coverage}%</td>
-          <td>${b.coverage}%</td>
+          <td>${num(a.coverage)}%</td>
+          <td>${num(b.coverage)}%</td>
           <td class="${deltaClass(dCoverage)}">${formatDelta(dCoverage, "%")}</td>
         </tr>
         <tr>

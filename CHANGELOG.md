@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.8.1] — 2026-09-08
+
+### Fixed
+- **Stored XSS via restored snapshots.** Snapshot metrics are interpolated into `innerHTML` unescaped, and neither read path validated them: `loadSnapshotsFromStorage` accepted any array, and the portfolio import checked only `typeof snap.integrity === "number"` (never `continuity`). A snapshot whose `integrity` was a string of markup executed on load. localStorage is scoped to the origin, so every project published under the same GitHub Pages account shares this store. `src/sanitize.js` now coerces every restored snapshot at the boundary, catalog-backed fields are dropped unless this build has them, and the render sites go through `num()`. `validate.mjs` fails the build if a raw metric interpolation reappears.
+
 ## [1.8.0] — 2026-09-06
 
 ### Added
