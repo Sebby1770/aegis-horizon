@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.8.2] — 2026-09-09
+
+### Fixed
+- **Dialogs did not hold keyboard focus.** They are marked `role="dialog" aria-modal="true"`, but nothing trapped Tab: six presses from the close button landed on a control behind the dialog while it was still open. Tab and Shift+Tab now cycle within the open dialog.
+- **Closing a dialog stranded focus on a hidden element.** Focus stayed on the now-hidden close button instead of returning to the control that opened the dialog, so the next Tab jumped somewhere arbitrary. Focus is restored to the opener.
+
+## [1.8.1] — 2026-09-08
+
+### Fixed
+- **Stored XSS via restored snapshots.** Snapshot metrics are interpolated into `innerHTML` unescaped, and neither read path validated them: `loadSnapshotsFromStorage` accepted any array, and the portfolio import checked only `typeof snap.integrity === "number"` (never `continuity`). A snapshot whose `integrity` was a string of markup executed on load. localStorage is scoped to the origin, so every project published under the same GitHub Pages account shares this store. `src/sanitize.js` now coerces every restored snapshot at the boundary, catalog-backed fields are dropped unless this build has them, and the render sites go through `num()`. `validate.mjs` fails the build if a raw metric interpolation reappears.
+
+## [1.8.0] — 2026-09-06
+
+### Added
+- **Shareable scenario links** (`src/share.js`). A rehearsal posture — mission, lens, horizon, pressures and safeguards — encodes to a short readable token (`1.caremesh.board.90.52-44-61.1101`) carried in the URL fragment, so it can be pasted into a ticket or a chat. The Share button copies the link, falling back to the address bar where the clipboard is unavailable, and a link pasted into an already-open tab is picked up too.
+- `validate.mjs` fails the build if a scenario token does not round-trip.
+
+### Changed
+- The twin map no longer animates while the tab is hidden or when `prefers-reduced-motion` is set; it renders a single static frame that still repaints on state changes.
+- Structural mission-graph validation: link endpoints must resolve, node coordinates must sit inside the canvas, weights must be in range.
+
+### Fixed
+- A link naming a missing node threw inside the animation frame and froze the twin map for the rest of the session.
+
 ## [1.7.0] — 2026-08-21
 
 ### Added

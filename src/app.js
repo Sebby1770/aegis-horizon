@@ -1,4 +1,7 @@
 import { controlWeights, horizonProfiles, lenses, missions } from "./data.js";
+import { readScenarioFromUrl, scenarioUrl } from "./share.js";
+import { sanitizeSnapshotList } from "./sanitize.js";
+import { focusableWithin, nextFocusTarget } from "./focus.js";
 import {
   techniqueCatalog,
   techniqueCoverage
@@ -132,6 +135,7 @@ const els = {
   compareMissionsButton: document.querySelector("#compareMissionsButton"),
   heatToggle: document.querySelector("#heatToggle"),
   helpButton: document.querySelector("#helpButton"),
+  shareScenarioButton: document.querySelector("#shareScenarioButton"),
   saveProfileButton: document.querySelector("#saveProfileButton"),
   saveAsProfileButton: document.querySelector("#saveAsProfileButton"),
   exportPortfolioButton: document.querySelector("#exportPortfolioButton"),
@@ -285,6 +289,18 @@ function sanitizeName(raw, fallback = DEFAULT_PROFILE_NAME) {
     .replace(/\s+/g, " ")
     .slice(0, 48);
   return cleaned || fallback;
+}
+
+/**
+ * Coerces a value that must render as a number.
+ *
+ * Snapshot metrics are interpolated into innerHTML without escaping. They are
+ * sanitised on the way in, but a template that assumes "this is a number"
+ * should say so at the point it matters too.
+ */
+function num(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
 }
 
 function setPressed(buttons, activeValue, dataName) {
@@ -479,6 +495,8 @@ function renderDashboard() {
   if (!els.sweepModal.hidden) renderSweepTable();
   if (!els.gapsModal.hidden) renderGapsTable();
   if (!els.missionCompareModal.hidden) renderMissionCompare();
+  // With animation paused the loop is not there to pick the change up.
+  if (!twinFrame) drawTwin();
 }
 
 function resizeCanvas(canvas, ctx) {
@@ -559,13 +577,7 @@ function nodeHeatColor(weight, alpha = 1) {
   return alpha === 1 ? `rgb(${r}, ${g}, ${b})` : `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-function drawTwin(timestamp = 0) {
-  if (timestamp - state.frameTime < 32) {
-    requestAnimationFrame(drawTwin);
-    return;
-  }
-  state.frameTime = timestamp;
-
+function drawTwin() {
   const rect = resizeCanvas(els.twinCanvas, twinCtx);
   const width = rect.width;
   const height = rect.height;
@@ -600,6 +612,11 @@ function drawTwin(timestamp = 0) {
   active.links.forEach(([fromId, toId, label], index) => {
     const from = nodeById(nodes, fromId);
     const to = nodeById(nodes, toId);
+    // A link naming a node that no longer exists used to throw here, which
+    // killed the animation frame and froze the twin for the rest of the
+    // session. tools/validate.mjs now fails on such a link; this keeps a stale
+    // catalog from taking the whole map down.
+    if (!from || !to) return;
     const activity = (Math.sin(pulse * 0.038 + index * 0.9) + 1) / 2;
     const heat = clamp((pressureScore() / 100 + (from.weight + to.weight) / 2) / 2, 0, 1);
     const linkColor = heat > 0.7 ? colors.red : heat > 0.56 ? colors.amber : colors.cyan;
@@ -678,8 +695,49 @@ function drawTwin(timestamp = 0) {
     twinCtx.restore();
   });
 
-  state.pulse += 1;
-  requestAnimationFrame(drawTwin);
+}
+
+const reducedMotion =
+  typeof window.matchMedia === "function"
+    ? window.matchMedia("(prefers-reduced-motion: reduce)")
+    : null;
+
+let twinFrame = 0;
+
+function twinShouldAnimate() {
+  return !document.hidden && !reducedMotion?.matches;
+}
+
+function twinLoop(timestamp) {
+  if (timestamp - state.frameTime >= 32) {
+    state.frameTime = timestamp;
+    state.pulse += 1;
+    drawTwin();
+  }
+  twinFrame = requestAnimationFrame(twinLoop);
+}
+
+function startTwin() {
+  if (twinFrame) return;
+  // A hidden tab still burned a full animation loop, and the map animates
+  // continuously, which is exactly what prefers-reduced-motion asks us not to
+  // do. Both cases render one static frame instead.
+  if (!twinShouldAnimate()) {
+    drawTwin();
+    return;
+  }
+  twinFrame = requestAnimationFrame(twinLoop);
+}
+
+function stopTwin() {
+  if (!twinFrame) return;
+  cancelAnimationFrame(twinFrame);
+  twinFrame = 0;
+}
+
+function syncTwinMotion() {
+  stopTwin();
+  startTwin();
 }
 
 function drawContinuity() {
@@ -727,6 +785,56 @@ function drawContinuity() {
 }
 
 /* ─── Profile / portfolio ─────────────────────────────────────────── */
+
+/** Applies a decoded scenario to live state and redraws everything. */
+function applyScenario(scenario) {
+  state.mission = scenario.mission;
+  state.lens = scenario.lens;
+  state.horizon = scenario.horizon;
+  state.pressure = { ...scenario.pressure };
+  state.controls = { ...scenario.controls };
+  renderMissionButtons();
+  updateControlsFromState();
+  renderDashboard();
+}
+
+async function shareScenario() {
+  const url = scenarioUrl(state, window.location.href);
+  try {
+    await navigator.clipboard.writeText(url);
+    markProfileState("Link copied");
+  } catch {
+    // Clipboard access needs a secure context and permission; falling back to
+    // the address bar still gives the reader something to copy by hand.
+    window.location.hash = new URL(url).hash;
+    markProfileState("Link in URL");
+  }
+}
+
+/**
+ * Loads a posture handed over in the URL fragment.
+ *
+ * The fragment is cleared afterwards so a reload does not keep resurrecting the
+ * shared posture over whatever the reader has since changed.
+ */
+function loadScenarioFromUrl() {
+  const result = readScenarioFromUrl(window.location.href, {
+    missions,
+    lenses,
+    horizons: horizonProfiles
+  });
+  if (!result) return;
+
+  if (result.scenario) {
+    applyScenario(result.scenario);
+    markProfileState("Shared");
+  } else {
+    markProfileState("Bad link");
+    console.warn(`Aegis Horizon: ${result.message}`);
+  }
+
+  window.history.replaceState(null, "", window.location.pathname + window.location.search);
+}
 
 function markProfileState(label) {
   els.profileState.textContent = label;
@@ -1031,23 +1139,13 @@ function importPortfolioFile(file) {
       }
 
       if (Array.isArray(data.snapshots)) {
-        snapshots = data.snapshots
-          .filter((snap) => snap && snap.name && typeof snap.integrity === "number")
-          .map((snap) => ({
-            id: snap.id || `snap-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-            name: sanitizeName(snap.name, "Snapshot"),
-            capturedAt: snap.capturedAt ?? new Date().toISOString(),
-            mission: snap.mission,
-            missionTitle: snap.missionTitle,
-            lens: snap.lens,
-            horizon: snap.horizon,
-            integrity: snap.integrity,
-            continuity: snap.continuity,
-            decisionLoad: snap.decisionLoad,
-            coverage: snap.coverage,
-            pressure: snap.pressure ?? { agent: 0, supplier: 0, data: 0 },
-            controls: snap.controls ?? {}
-          }));
+        // Same boundary check as the localStorage path: an imported file is no
+        // more trustworthy than a stored one.
+        snapshots = sanitizeSnapshotList(data.snapshots, catalogs()).map((snap) => ({
+          ...snap,
+          name: sanitizeName(snap.name, "Snapshot"),
+          capturedAt: snap.capturedAt || new Date().toISOString()
+        }));
         persistSnapshots();
         renderSnapshotList();
       }
@@ -1084,11 +1182,15 @@ function loadSnapshotsFromStorage() {
       snapshots = [];
       return;
     }
-    const data = JSON.parse(stored);
-    snapshots = Array.isArray(data) ? data : [];
+    snapshots = sanitizeSnapshotList(JSON.parse(stored), catalogs());
   } catch {
     snapshots = [];
   }
+}
+
+/** The catalogs a restored snapshot is allowed to reference. */
+function catalogs() {
+  return { missions, lenses, horizons: horizonProfiles };
 }
 
 function captureSnapshot() {
@@ -1141,7 +1243,7 @@ function renderSnapshotList() {
         <li class="snapshot-item" data-snapshot-id="${escapeHtml(snap.id)}">
           <div class="profile-item-meta">
             <strong>${escapeHtml(snap.name)}</strong>
-            <small>I ${snap.integrity}% · C ${snap.continuity}% · ${escapeHtml(when)}</small>
+            <small>I ${num(snap.integrity)}% · C ${num(snap.continuity)}% · ${escapeHtml(when)}</small>
           </div>
           <div class="profile-item-actions">
             <button type="button" data-snapshot-delete="${escapeHtml(snap.id)}" title="Delete snapshot">Del</button>
@@ -1159,7 +1261,7 @@ function fillCompareSelects() {
       : snapshots
           .map(
             (snap) =>
-              `<option value="${escapeHtml(snap.id)}">${escapeHtml(snap.name)} (${snap.integrity}/${snap.continuity})</option>`
+              `<option value="${escapeHtml(snap.id)}">${escapeHtml(snap.name)} (${num(snap.integrity)}/${num(snap.continuity)})</option>`
           )
           .join("");
   const prevA = els.compareSelectA.value;
@@ -1223,26 +1325,26 @@ function renderCompareResults() {
       <tbody>
         <tr>
           <td>Integrity</td>
-          <td>${a.integrity}%</td>
-          <td>${b.integrity}%</td>
+          <td>${num(a.integrity)}%</td>
+          <td>${num(b.integrity)}%</td>
           <td class="${deltaClass(dIntegrity)}">${formatDelta(dIntegrity, "%")}</td>
         </tr>
         <tr>
           <td>Continuity</td>
-          <td>${a.continuity}%</td>
-          <td>${b.continuity}%</td>
+          <td>${num(a.continuity)}%</td>
+          <td>${num(b.continuity)}%</td>
           <td class="${deltaClass(dContinuity)}">${formatDelta(dContinuity, "%")}</td>
         </tr>
         <tr>
           <td>Decision load</td>
-          <td>${a.decisionLoad}</td>
-          <td>${b.decisionLoad}</td>
+          <td>${num(a.decisionLoad)}</td>
+          <td>${num(b.decisionLoad)}</td>
           <td class="${deltaClass(-dLoad)}">${formatDelta(dLoad)}</td>
         </tr>
         <tr>
           <td>Safeguards</td>
-          <td>${a.coverage}%</td>
-          <td>${b.coverage}%</td>
+          <td>${num(a.coverage)}%</td>
+          <td>${num(b.coverage)}%</td>
           <td class="${deltaClass(dCoverage)}">${formatDelta(dCoverage, "%")}</td>
         </tr>
         <tr>
@@ -1284,12 +1386,70 @@ function openCompareModal() {
   closeOverlays();
   fillCompareSelects();
   renderCompareResults();
-  els.compareModal.hidden = false;
-  els.closeCompareModal.focus();
+  openOverlay(els.compareModal, els.closeCompareModal);
+}
+
+/* ─── Dialog focus management ─────────────────────────────────────── */
+
+/** The control that opened the current dialog, so focus can go back to it. */
+let overlayReturnFocus = null;
+
+function openOverlay(element, initialFocus) {
+  // Remember where focus came from before the dialog steals it. closeOverlays()
+  // runs first in several callers, so only record a target outside any dialog.
+  const active = document.activeElement;
+  if (active instanceof HTMLElement && !active.closest(".modal-panel, .overlay")) {
+    overlayReturnFocus = active;
+  }
+  element.hidden = false;
+  initialFocus?.focus();
+}
+
+function closeOverlay(element) {
+  if (element.hidden) return;
+  const active = document.activeElement;
+  element.hidden = true;
+  // Only reclaim focus if it was inside the dialog we just hid — otherwise the
+  // user has already moved on and we would yank them back.
+  if (active instanceof HTMLElement && element.contains(active)) {
+    if (overlayReturnFocus?.isConnected) overlayReturnFocus.focus();
+    else active.blur();
+  }
+}
+
+function openOverlayElement() {
+  return [els.compareModal, els.sweepModal, els.gapsModal, els.missionCompareModal, els.helpOverlay].find(
+    (element) => element && !element.hidden
+  );
+}
+
+/**
+ * Keeps Tab inside an open dialog.
+ *
+ * aria-modal="true" tells assistive technology to ignore the background, but
+ * the browser will still tab into it, so the keyboard has to be held here
+ * explicitly.
+ */
+function trapOverlayFocus(event) {
+  if (event.key !== "Tab") return;
+  const overlay = openOverlayElement();
+  if (!overlay) return;
+
+  const focusable = focusableWithin(overlay);
+  if (focusable.length === 0) {
+    event.preventDefault();
+    return;
+  }
+
+  const target = nextFocusTarget(focusable, document.activeElement, event.shiftKey);
+  if (target) {
+    event.preventDefault();
+    target.focus();
+  }
 }
 
 function closeCompareModal() {
-  els.compareModal.hidden = true;
+  closeOverlay(els.compareModal);
 }
 
 /* ─── Packet export + print report ────────────────────────────────── */
@@ -1506,19 +1666,19 @@ function renderHorizonStrip() {
 }
 
 function closeSweepModal() {
-  els.sweepModal.hidden = true;
+  closeOverlay(els.sweepModal);
 }
 
 function closeGapsModal() {
-  els.gapsModal.hidden = true;
+  closeOverlay(els.gapsModal);
 }
 
 function closeMissionCompareModal() {
-  els.missionCompareModal.hidden = true;
+  closeOverlay(els.missionCompareModal);
 }
 
 function closeHelpOverlay() {
-  els.helpOverlay.hidden = true;
+  closeOverlay(els.helpOverlay);
 }
 
 function closeOverlays() {
@@ -1560,8 +1720,7 @@ function renderSweepTable() {
 function openSweepModal() {
   closeOverlays();
   renderSweepTable();
-  els.sweepModal.hidden = false;
-  els.closeSweepModal.focus();
+  openOverlay(els.sweepModal, els.closeSweepModal);
 }
 
 function renderGapsTable() {
@@ -1607,8 +1766,7 @@ function renderGapsTable() {
 function openGapsModal() {
   closeOverlays();
   renderGapsTable();
-  els.gapsModal.hidden = false;
-  els.closeGapsModal.focus();
+  openOverlay(els.gapsModal, els.closeGapsModal);
 }
 
 function missionOptionMarkup() {
@@ -1687,14 +1845,12 @@ function openMissionCompareModal() {
   closeOverlays();
   fillMissionCompareSelects();
   renderMissionCompare();
-  els.missionCompareModal.hidden = false;
-  els.closeMissionCompareModal.focus();
+  openOverlay(els.missionCompareModal, els.closeMissionCompareModal);
 }
 
 function openHelpOverlay() {
   closeOverlays();
-  els.helpOverlay.hidden = false;
-  els.closeHelpOverlay.focus();
+  openOverlay(els.helpOverlay, els.closeHelpOverlay);
 }
 
 function syncHeatToggle() {
@@ -1885,7 +2041,14 @@ function bindEvents() {
     document.body.classList.remove("is-printing");
   });
 
+  els.shareScenarioButton?.addEventListener("click", () => void shareScenario());
+  // Pasting a scenario link into an already-open tab is a fragment-only
+  // navigation, which does not reload the page — pick it up here too.
+  window.addEventListener("hashchange", loadScenarioFromUrl);
+  document.addEventListener("keydown", trapOverlayFocus, true);
   window.addEventListener("resize", drawContinuity);
+  document.addEventListener("visibilitychange", syncTwinMotion);
+  reducedMotion?.addEventListener?.("change", syncTwinMotion);
 }
 
 /* ─── Boot ────────────────────────────────────────────────────────── */
@@ -1900,4 +2063,5 @@ syncHeatToggle();
 renderProfileList();
 renderSnapshotList();
 renderDashboard();
-drawTwin();
+loadScenarioFromUrl();
+startTwin();

@@ -1,8 +1,14 @@
 import { readFile } from "node:fs/promises";
 
+import { controlWeights, horizonProfiles, lenses, missions } from "../src/data.js";
+import { decodeScenario, encodeScenario } from "../src/share.js";
+
 const requiredFiles = [
   "index.html",
   "src/app.js",
+  "src/share.js",
+  "src/sanitize.js",
+  "src/focus.js",
   "src/data.js",
   "src/score.js",
   "src/techniques.js",
@@ -18,6 +24,77 @@ const requiredFiles = [
 async function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
+  }
+}
+
+async function validateShareRoundTrip() {
+  // A scenario link is the one artefact that leaves the machine, so a broken
+  // round trip must fail the build rather than surface as a bad link later.
+  const posture = {
+    mission: Object.keys(missions)[0],
+    lens: Object.keys(lenses)[0],
+    horizon: Number(Object.keys(horizonProfiles)[0]),
+    pressure: { agent: 52, supplier: 44, data: 61 },
+    controls: { approvals: true, recovery: false, attestation: true, privacy: false }
+  };
+  const catalogs = { missions, lenses, horizons: horizonProfiles };
+  const decoded = decodeScenario(encodeScenario(posture), catalogs);
+  await assert(Boolean(decoded.scenario), "scenario token must decode");
+  await assert(
+    JSON.stringify(decoded.scenario) === JSON.stringify(posture),
+    "scenario token must round-trip unchanged"
+  );
+}
+
+async function validateMissionGraphs() {
+  for (const [key, mission] of Object.entries(missions)) {
+    const ids = new Set(mission.nodes.map((node) => node.id));
+
+    await assert(mission.nodes.length > 0, `${key} has no nodes`);
+    await assert(ids.size === mission.nodes.length, `${key} has duplicate node ids`);
+
+    for (const node of mission.nodes) {
+      // Coordinates are drawn as fractions of the canvas, so anything outside
+      // 0..1 renders off-screen.
+      await assert(
+        node.x >= 0 && node.x <= 1 && node.y >= 0 && node.y <= 1,
+        `${key} node ${node.id} sits outside the canvas (x ${node.x}, y ${node.y})`
+      );
+      await assert(
+        node.weight >= 0 && node.weight <= 1,
+        `${key} node ${node.id} has an out-of-range weight (${node.weight})`
+      );
+      await assert(Boolean(node.label), `${key} node ${node.id} has no label`);
+    }
+
+    for (const [fromId, toId, label] of mission.links) {
+      // A link naming a node that does not exist threw inside the animation
+      // frame, which froze the twin map for the rest of the session.
+      await assert(ids.has(fromId), `${key} link "${label}" starts at unknown node ${fromId}`);
+      await assert(ids.has(toId), `${key} link "${label}" ends at unknown node ${toId}`);
+    }
+
+    await assert(mission.timeline.length > 0, `${key} has an empty tabletop timeline`);
+    await assert(mission.evidence.length > 0, `${key} has no evidence items`);
+    await assert(mission.signals.length > 0, `${key} has no futures signals`);
+    await assert(Boolean(mission.crownJewel), `${key} names no crown jewel`);
+  }
+}
+
+async function validateCatalogs() {
+  await assert(Object.keys(lenses).length > 0, "lens catalog must not be empty");
+  await assert(Object.keys(horizonProfiles).length > 0, "horizon catalog must not be empty");
+
+  for (const [key, weight] of Object.entries(controlWeights)) {
+    await assert(
+      Number.isFinite(weight) && weight > 0,
+      `control weight ${key} must be a positive number`
+    );
+  }
+
+  for (const [key, profile] of Object.entries(horizonProfiles)) {
+    await assert(Number.isFinite(profile.drift), `horizon ${key} has a non-numeric drift`);
+    await assert(Number.isFinite(profile.maturity), `horizon ${key} has a non-numeric maturity`);
   }
 }
 
@@ -173,9 +250,9 @@ async function main() {
 
   // Package version
   const pkg = JSON.parse(byPath["package.json"]);
-  await assert(pkg.version === "1.7.0", `package.json version should be 1.7.0 (got ${pkg.version})`);
+  await assert(pkg.version === "1.8.2", `package.json version should be 1.8.2 (got ${pkg.version})`);
   await assert(!pkg.dependencies || Object.keys(pkg.dependencies).length === 0, "no runtime npm dependencies allowed");
-  await assert(byPath["CHANGELOG.md"].includes("[1.7.0]"), "CHANGELOG must include 1.7.0");
+  await assert(byPath["CHANGELOG.md"].includes("[1.8.2]"), "CHANGELOG must include 1.8.2");
   await assert(byPath["README.md"].includes("https://sebby1770.github.io/aegis-horizon/"), "README must document Pages URL");
 
   // No remote network calls in app modules (blob/data/local only)
@@ -194,6 +271,37 @@ async function main() {
   const combined = scannedPaths.map((path) => byPath[path]).join("\n").toLowerCase();
   const unsafeHit = unsafeTerms.find((term) => combined.includes(term));
   await assert(!unsafeHit, `unsafe offensive term found: ${unsafeHit}`);
+
+  await assert(
+    byPath["src/share.js"].includes("export function encodeScenario"),
+    "share.js must export encodeScenario"
+  );
+  await assert(
+    byPath["src/share.js"].includes("export function decodeScenario"),
+    "share.js must export decodeScenario"
+  );
+  await assert(
+    byPath["src/sanitize.js"].includes("export function sanitizeSnapshotList"),
+    "sanitize.js must export sanitizeSnapshotList"
+  );
+  await assert(
+    !/\$\{(?:snap|a|b)\.(?:integrity|continuity|coverage|decisionLoad)\}/.test(byPath["src/app.js"]),
+    "snapshot metrics must go through num() before reaching innerHTML"
+  );
+  await assert(
+    byPath["src/app.js"].includes("trapOverlayFocus"),
+    "dialogs must trap Tab focus"
+  );
+  await assert(
+    !/els\.\w+Modal\.hidden = (?:true|false);/.test(byPath["src/app.js"]) &&
+      !/els\.helpOverlay\.hidden = (?:true|false);/.test(byPath["src/app.js"]),
+    "dialogs must open and close through openOverlay/closeOverlay so focus is restored"
+  );
+  await validateShareRoundTrip();
+
+  await validateMissionGraphs();
+  await validateCatalogs();
+
 
   console.log(
     `Validated ${requiredFiles.length} files, ${scenarioMatches.length} scenarios, score/rehearsal/csv/sweep/gaps/compare/markdown/heat/help/horizon/blurb features, v${pkg.version}.`

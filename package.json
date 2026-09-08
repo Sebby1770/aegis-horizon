@@ -1,11 +1,11 @@
 {
   "name": "aegis-horizon",
-  "version": "1.7.0",
+  "version": "1.8.2",
   "description": "A local-first cyber resilience twin studio for future defensive systems and policy rehearsal.",
   "type": "module",
   "scripts": {
     "start": "python3 -m http.server 4173",
-    "test": "node tools/validate.mjs && node --test tools/score.test.mjs"
+    "test": "node tools/validate.mjs && node --test tools/score.test.mjs tools/share.test.mjs tools/sanitize.test.mjs tools/focus.test.mjs"
   },
   "keywords": [
     "cybersecurity",
