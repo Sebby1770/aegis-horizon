@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.8.2] — 2026-09-09
+
+### Fixed
+- **Dialogs did not hold keyboard focus.** They are marked `role="dialog" aria-modal="true"`, but nothing trapped Tab: six presses from the close button landed on a control behind the dialog while it was still open. Tab and Shift+Tab now cycle within the open dialog.
+- **Closing a dialog stranded focus on a hidden element.** Focus stayed on the now-hidden close button instead of returning to the control that opened the dialog, so the next Tab jumped somewhere arbitrary. Focus is restored to the opener.
+
 ## [1.8.1] — 2026-09-08
 
 ### Fixed

@@ -1,6 +1,7 @@
 import { controlWeights, horizonProfiles, lenses, missions } from "./data.js";
 import { readScenarioFromUrl, scenarioUrl } from "./share.js";
 import { sanitizeSnapshotList } from "./sanitize.js";
+import { focusableWithin, nextFocusTarget } from "./focus.js";
 import {
   techniqueCatalog,
   techniqueCoverage
@@ -1385,12 +1386,70 @@ function openCompareModal() {
   closeOverlays();
   fillCompareSelects();
   renderCompareResults();
-  els.compareModal.hidden = false;
-  els.closeCompareModal.focus();
+  openOverlay(els.compareModal, els.closeCompareModal);
+}
+
+/* ─── Dialog focus management ─────────────────────────────────────── */
+
+/** The control that opened the current dialog, so focus can go back to it. */
+let overlayReturnFocus = null;
+
+function openOverlay(element, initialFocus) {
+  // Remember where focus came from before the dialog steals it. closeOverlays()
+  // runs first in several callers, so only record a target outside any dialog.
+  const active = document.activeElement;
+  if (active instanceof HTMLElement && !active.closest(".modal-panel, .overlay")) {
+    overlayReturnFocus = active;
+  }
+  element.hidden = false;
+  initialFocus?.focus();
+}
+
+function closeOverlay(element) {
+  if (element.hidden) return;
+  const active = document.activeElement;
+  element.hidden = true;
+  // Only reclaim focus if it was inside the dialog we just hid — otherwise the
+  // user has already moved on and we would yank them back.
+  if (active instanceof HTMLElement && element.contains(active)) {
+    if (overlayReturnFocus?.isConnected) overlayReturnFocus.focus();
+    else active.blur();
+  }
+}
+
+function openOverlayElement() {
+  return [els.compareModal, els.sweepModal, els.gapsModal, els.missionCompareModal, els.helpOverlay].find(
+    (element) => element && !element.hidden
+  );
+}
+
+/**
+ * Keeps Tab inside an open dialog.
+ *
+ * aria-modal="true" tells assistive technology to ignore the background, but
+ * the browser will still tab into it, so the keyboard has to be held here
+ * explicitly.
+ */
+function trapOverlayFocus(event) {
+  if (event.key !== "Tab") return;
+  const overlay = openOverlayElement();
+  if (!overlay) return;
+
+  const focusable = focusableWithin(overlay);
+  if (focusable.length === 0) {
+    event.preventDefault();
+    return;
+  }
+
+  const target = nextFocusTarget(focusable, document.activeElement, event.shiftKey);
+  if (target) {
+    event.preventDefault();
+    target.focus();
+  }
 }
 
 function closeCompareModal() {
-  els.compareModal.hidden = true;
+  closeOverlay(els.compareModal);
 }
 
 /* ─── Packet export + print report ────────────────────────────────── */
@@ -1607,19 +1666,19 @@ function renderHorizonStrip() {
 }
 
 function closeSweepModal() {
-  els.sweepModal.hidden = true;
+  closeOverlay(els.sweepModal);
 }
 
 function closeGapsModal() {
-  els.gapsModal.hidden = true;
+  closeOverlay(els.gapsModal);
 }
 
 function closeMissionCompareModal() {
-  els.missionCompareModal.hidden = true;
+  closeOverlay(els.missionCompareModal);
 }
 
 function closeHelpOverlay() {
-  els.helpOverlay.hidden = true;
+  closeOverlay(els.helpOverlay);
 }
 
 function closeOverlays() {
@@ -1661,8 +1720,7 @@ function renderSweepTable() {
 function openSweepModal() {
   closeOverlays();
   renderSweepTable();
-  els.sweepModal.hidden = false;
-  els.closeSweepModal.focus();
+  openOverlay(els.sweepModal, els.closeSweepModal);
 }
 
 function renderGapsTable() {
@@ -1708,8 +1766,7 @@ function renderGapsTable() {
 function openGapsModal() {
   closeOverlays();
   renderGapsTable();
-  els.gapsModal.hidden = false;
-  els.closeGapsModal.focus();
+  openOverlay(els.gapsModal, els.closeGapsModal);
 }
 
 function missionOptionMarkup() {
@@ -1788,14 +1845,12 @@ function openMissionCompareModal() {
   closeOverlays();
   fillMissionCompareSelects();
   renderMissionCompare();
-  els.missionCompareModal.hidden = false;
-  els.closeMissionCompareModal.focus();
+  openOverlay(els.missionCompareModal, els.closeMissionCompareModal);
 }
 
 function openHelpOverlay() {
   closeOverlays();
-  els.helpOverlay.hidden = false;
-  els.closeHelpOverlay.focus();
+  openOverlay(els.helpOverlay, els.closeHelpOverlay);
 }
 
 function syncHeatToggle() {
@@ -1990,6 +2045,7 @@ function bindEvents() {
   // Pasting a scenario link into an already-open tab is a fragment-only
   // navigation, which does not reload the page — pick it up here too.
   window.addEventListener("hashchange", loadScenarioFromUrl);
+  document.addEventListener("keydown", trapOverlayFocus, true);
   window.addEventListener("resize", drawContinuity);
   document.addEventListener("visibilitychange", syncTwinMotion);
   reducedMotion?.addEventListener?.("change", syncTwinMotion);
