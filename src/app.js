@@ -48,6 +48,7 @@ import {
   pressureSweep,
   recoveryWindow as scoreRecoveryWindow,
   signalScore as scoreSignal,
+  watchItems,
   weakestNode
 } from "./score.js";
 
@@ -95,6 +96,8 @@ const els = {
   missionButtons: document.querySelector("#missionButtons"),
   missionSearch: document.querySelector("#missionSearch"),
   signStatus: document.querySelector("#signStatus"),
+  utcClock: document.querySelector("#utcClock"),
+  watchList: document.querySelector("#watchList"),
   missionCode: document.querySelector("#missionCode"),
   missionTitle: document.querySelector("#missionTitle"),
   missionBrief: document.querySelector("#missionBrief"),
@@ -336,6 +339,33 @@ function setPressed(buttons, activeValue, dataName) {
   });
 }
 
+function tickUtcClock() {
+  if (!els.utcClock) return;
+  const iso = new Date().toISOString();
+  els.utcClock.dateTime = iso;
+  els.utcClock.textContent = iso.slice(11, 19) + "Z";
+}
+
+function renderWatchList() {
+  if (!els.watchList) return;
+  const items = watchItems(mission());
+  if (!items.length) {
+    els.watchList.innerHTML = `<p class="muted-copy">No watch items.</p>`;
+    return;
+  }
+  els.watchList.innerHTML = `
+    <div class="csf-head"><span>Watch</span><strong>${items.length}</strong></div>
+    <ul>
+      ${items
+        .map(
+          (item) =>
+            `<li><span>${escapeHtml(item.kind)}</span><strong>${escapeHtml(item.label)}</strong></li>`
+        )
+        .join("")}
+    </ul>
+  `;
+}
+
 function renderSignStatus() {
   if (!els.signStatus) return;
   els.signStatus.textContent = state.packetSigned ? "Packet signed" : "Unsigned packet";
@@ -533,6 +563,7 @@ function renderDashboard() {
   renderCsfPanel();
   renderPlaybook();
   renderSignStatus();
+  renderWatchList();
 
   renderTimeline();
   renderPolicy(score);
@@ -2328,5 +2359,7 @@ syncHeatToggle();
 renderProfileList();
 renderSnapshotList();
 renderDashboard();
+tickUtcClock();
+window.setInterval(tickUtcClock, 1000);
 loadScenarioFromUrl();
 startTwin();

@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.2.0] — 2026-09-13
+
+### Added
+- UTC clock in the command bar.
+- Operator watch list (weakest / hottest / isolated nodes) under the CSF panel.
+
 ## [2.1.0] — 2026-09-13
 
 ### Added

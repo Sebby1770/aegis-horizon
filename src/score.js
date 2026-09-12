@@ -151,6 +151,24 @@ export function hottestNode(mission) {
 }
 
 /**
+ * Compact operator watch list: weakest node, hottest node, then isolated nodes.
+ * Capped at six rows. Pure; no DOM.
+ */
+export function watchItems(mission) {
+  const items = [];
+  const weak = weakestNode(mission);
+  const hot = hottestNode(mission);
+  if (weak) items.push({ kind: "weakest", id: weak.id, label: weak.label });
+  if (hot && hot.id !== weak?.id) items.push({ kind: "hottest", id: hot.id, label: hot.label });
+  for (const node of isolatedNodes(mission)) {
+    if (items.some((item) => item.id === node.id)) continue;
+    items.push({ kind: "isolated", id: node.id, label: node.label });
+    if (items.length >= 6) break;
+  }
+  return items;
+}
+
+/**
  * Integrity and continuity at 30 / 90 / 180 without mutating the selected horizon.
  * Missing keys in horizonsMap are skipped.
  * @returns {Array<{ days: number, integrity: number, continuity: number, label: string }>}

@@ -148,6 +148,37 @@ button {
   animation: pulse-live 1.8s ease-in-out infinite;
 }
 
+.utc-clock {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  color: var(--cyan);
+}
+
+.watch-list {
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.watch-list ul {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.watch-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.78rem;
+}
+.watch-list li span {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
 .sign-pill {
   display: inline-flex;
   align-items: center;

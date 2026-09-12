@@ -270,12 +270,15 @@ async function main() {
 
   // Package version
   const pkg = JSON.parse(byPath["package.json"]);
-  await assert(pkg.version === "2.1.0", `package.json version should be 2.1.0 (got ${pkg.version})`);
+  await assert(pkg.version === "2.2.0", `package.json version should be 2.2.0 (got ${pkg.version})`);
   await assert(!pkg.dependencies || Object.keys(pkg.dependencies).length === 0, "no runtime npm dependencies allowed");
-  await assert(byPath["CHANGELOG.md"].includes("[2.1.0]"), "CHANGELOG must include 2.1.0");
+  await assert(byPath["CHANGELOG.md"].includes("[2.2.0]"), "CHANGELOG must include 2.2.0");
   await assert(byPath["index.html"].includes('id="missionSearch"'), "mission search required");
   await assert(byPath["index.html"].includes('id="signStatus"'), "sign status pill required");
+  await assert(byPath["index.html"].includes('id="utcClock"'), "utc clock required");
+  await assert(byPath["index.html"].includes('id="watchList"'), "watch list required");
   await assert(byPath["src/app.js"].includes("missionQuery"), "app.js must filter missions");
+  await assert(byPath["src/score.js"].includes("export function watchItems"), "score.js must export watchItems");
   await assert(byPath["README.md"].includes("https://sebby1770.github.io/aegis-horizon/"), "README must document Pages URL");
 
   // No remote network calls in app modules (blob/data/local only)

@@ -1,6 +1,6 @@
 {
   "name": "aegis-horizon",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "A local-first cyber resilience twin studio — command-center tabletop, NIST CSF 2.0 posture, and signed defensive policy packets.",
   "type": "module",
   "scripts": {

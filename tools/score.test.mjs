@@ -28,6 +28,7 @@ import {
   pressureSweep,
   resilienceIndex,
   serializeCsv,
+  watchItems,
   weakestNode,
   worstFlip
 } from "../src/score.js";
@@ -251,6 +252,15 @@ describe("weakestNode", () => {
       ]
     };
     assert.equal(weakestNode(tied).id, "first");
+  });
+});
+
+describe("watchItems", () => {
+  it("leads with the weakest watergrid node and stays short", () => {
+    const items = watchItems(missions.watergrid);
+    assert.ok(items.length >= 1 && items.length <= 6);
+    assert.equal(items[0].kind, "weakest");
+    assert.equal(items[0].id, "offline-dose");
   });
 });
 
