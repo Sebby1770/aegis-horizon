@@ -3,12 +3,12 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#0f1214">
+    <meta name="theme-color" content="#050a14">
     <meta
       name="description"
-      content="Aegis Horizon is a local-first cyber resilience twin studio for future defensive systems, tabletop rehearsals, and policy packets."
+      content="Aegis Horizon is a local-first cyber resilience twin studio — a NORAD-style command center for tabletop rehearsal, NIST CSF 2.0 posture, and defensive policy packets."
     >
-    <title>Aegis Horizon</title>
+    <title>Aegis Horizon — Cyber Resilience Twin Studio</title>
     <link rel="icon" href="assets/aegis-mark.svg" type="image/svg+xml">
     <link rel="stylesheet" href="src/styles.css">
     <script type="module" src="src/app.js"></script>
@@ -20,9 +20,11 @@
           <img src="assets/aegis-mark.svg" alt="" width="44" height="44">
           <span>
             <strong>Aegis Horizon</strong>
-            <small>Resilience Twin Studio</small>
+            <small>Cyber Resilience Twin Studio</small>
           </span>
         </a>
+        <span class="live-pill" aria-hidden="true">SECTOR LIVE</span>
+        <span class="sign-pill" id="signStatus">Unsigned packet</span>
 
         <div class="status-strip" aria-label="Twin posture summary">
           <div>
@@ -48,9 +50,13 @@
         <aside class="mission-dock" aria-label="Resilience twin controls">
           <section class="dock-section">
             <div class="section-heading">
-              <span>Future System</span>
+              <span>Sectors</span>
               <strong id="missionCode">CM-32</strong>
             </div>
+            <label class="field-row" for="missionSearch">
+              <span>Find sector</span>
+              <input id="missionSearch" type="search" maxlength="48" placeholder="rail, hospital, grid…" autocomplete="off" spellcheck="false">
+            </label>
             <div class="mission-list" id="missionButtons"></div>
           </section>
 
@@ -202,6 +208,9 @@
                 <button class="icon-button" id="exportButton" type="button" aria-label="Export policy packet JSON" title="Export JSON">
                   <span aria-hidden="true">E</span>
                 </button>
+                <button class="icon-button" id="signPacketButton" type="button" aria-label="Sign policy packet" title="Sign packet (S)">
+                  <span aria-hidden="true">S</span>
+                </button>
                 <button class="icon-button is-wide" id="csvExportButton" type="button" aria-label="Export policy packet CSV" title="Export CSV">
                   <span aria-hidden="true">CSV</span>
                 </button>
@@ -239,10 +248,12 @@
             <section class="twin-panel" aria-label="Live system twin">
               <canvas id="twinCanvas" width="1200" height="760"></canvas>
               <div class="twin-overlay">
+                <span class="overlay-kicker">Crown jewel</span>
                 <span id="crownLabel">Patient continuity ledger</span>
                 <strong id="promiseLabel">No patient loses care context</strong>
                 <small id="mapTelemetry">6 assets, 6 trust paths</small>
               </div>
+              <div class="hud-corners" aria-hidden="true"></div>
             </section>
 
             <aside class="decision-panel" aria-label="Decision packet">
@@ -270,7 +281,12 @@
                   <span>Window</span>
                   <strong id="recoveryWindow">32m</strong>
                 </div>
+                <div>
+                  <span>Index</span>
+                  <strong id="resilienceMetric">74</strong>
+                </div>
               </div>
+              <div class="csf-panel" id="csfPanel" aria-label="NIST CSF 2.0"></div>
               <div class="horizon-strip" id="horizonStrip" aria-label="Horizon integrity"></div>
               <p class="horizon-drop" id="horizonDrop"></p>
               <p class="horizon-drop" id="continuityDrop"></p>
@@ -279,6 +295,14 @@
           </div>
 
           <div class="briefing-grid">
+            <section class="briefing-panel playbook-panel" aria-label="Continuity playbook">
+              <div class="panel-heading">
+                <span>Continuity Playbook</span>
+                <strong id="playbookState">5 beats</strong>
+              </div>
+              <ol class="playbook-list" id="playbookList"></ol>
+            </section>
+
             <section class="briefing-panel timeline-panel" aria-label="Tabletop timeline">
               <div class="panel-heading">
                 <span>Tabletop Timeline</span>
@@ -424,6 +448,14 @@
               <dd>Help</dd>
             </div>
             <div>
+              <dt>/</dt>
+              <dd>Find a sector</dd>
+            </div>
+            <div>
+              <dt>S</dt>
+              <dd>Sign policy packet</dd>
+            </div>
+            <div>
               <dt>Esc</dt>
               <dd>Close overlay</dd>
             </div>
@@ -483,6 +515,17 @@
         <section class="print-section">
           <h2>Evidence checklist</h2>
           <ul id="printEvidenceList"></ul>
+        </section>
+
+        <section class="print-section">
+          <h2>NIST CSF 2.0</h2>
+          <ul id="printCsfList"></ul>
+          <p id="printResilienceIndex">—</p>
+        </section>
+
+        <section class="print-section">
+          <h2>Continuity playbook</h2>
+          <ol id="printPlaybookList"></ol>
         </section>
 
         <footer class="print-report-footer">

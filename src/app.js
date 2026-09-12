@@ -7,6 +7,14 @@ import {
   techniqueCoverage
 } from "./techniques.js";
 import {
+  canonicalJsonBytes,
+  ensureDeviceKeys,
+  exportPublicJwk,
+  PACKET_ALG,
+  signPacket,
+  webCryptoAvailable
+} from "./sign.js";
+import {
   buildPacketCsv,
   buildPolicyRows as scorePolicyRows,
   clamp,
@@ -14,12 +22,17 @@ import {
   continuityScore as scoreContinuity,
   controlDeltas,
   coverage as scoreCoverage,
+  CSF_KEYS,
+  CSF_LABELS,
+  csfFunctions,
   decisionHeadline as scoreHeadline,
   decisionLoad as scoreDecisionLoad,
   decisionSummary as scoreSummary,
   evidenceReady as scoreEvidenceReady,
   integrityScore as scoreIntegrity,
   packetMarkdown,
+  playbookBeats,
+  resilienceIndex as scoreResilienceIndex,
   bestFlip,
   boardBlurb,
   continuityDrop,
@@ -67,7 +80,9 @@ const state = {
   frameTime: 0,
   lastPacketDigest: null,
   rehearsalStep: 0,
-  heat: false
+  heat: false,
+  missionQuery: "",
+  packetSigned: false
 };
 
 /** In-memory portfolio: { [name]: profilePayload } */
@@ -78,6 +93,8 @@ let snapshots = [];
 
 const els = {
   missionButtons: document.querySelector("#missionButtons"),
+  missionSearch: document.querySelector("#missionSearch"),
+  signStatus: document.querySelector("#signStatus"),
   missionCode: document.querySelector("#missionCode"),
   missionTitle: document.querySelector("#missionTitle"),
   missionBrief: document.querySelector("#missionBrief"),
@@ -109,6 +126,10 @@ const els = {
   decisionLoad: document.querySelector("#decisionLoad"),
   safeguardMetric: document.querySelector("#safeguardMetric"),
   recoveryWindow: document.querySelector("#recoveryWindow"),
+  resilienceMetric: document.querySelector("#resilienceMetric"),
+  csfPanel: document.querySelector("#csfPanel"),
+  playbookList: document.querySelector("#playbookList"),
+  playbookState: document.querySelector("#playbookState"),
   timelineClock: document.querySelector("#timelineClock"),
   timelineList: document.querySelector("#timelineList"),
   policyState: document.querySelector("#policyState"),
@@ -127,6 +148,7 @@ const els = {
   nextBeatButton: document.querySelector("#nextBeatButton"),
   resetRehearsalButton: document.querySelector("#resetRehearsalButton"),
   exportButton: document.querySelector("#exportButton"),
+  signPacketButton: document.querySelector("#signPacketButton"),
   csvExportButton: document.querySelector("#csvExportButton"),
   markdownExportButton: document.querySelector("#markdownExportButton"),
   printReportButton: document.querySelector("#printReportButton"),
@@ -164,6 +186,9 @@ const els = {
   printTechniqueList: document.querySelector("#printTechniqueList"),
   printTimelineList: document.querySelector("#printTimelineList"),
   printEvidenceList: document.querySelector("#printEvidenceList"),
+  printCsfList: document.querySelector("#printCsfList"),
+  printResilienceIndex: document.querySelector("#printResilienceIndex"),
+  printPlaybookList: document.querySelector("#printPlaybookList"),
   printGeneratedAt: document.querySelector("#printGeneratedAt"),
   printDigest: document.querySelector("#printDigest"),
   sweepModal: document.querySelector("#sweepModal"),
@@ -185,14 +210,14 @@ const twinCtx = els.twinCanvas.getContext("2d");
 const continuityCtx = els.continuityCanvas.getContext("2d");
 
 const colors = {
-  background: "#0f1214",
-  panel: "#14191a",
-  line: "rgba(232, 239, 223, 0.13)",
-  grid: "rgba(232, 239, 223, 0.07)",
-  text: "#f3f6ea",
-  muted: "#9aa59a",
-  safe: "#8ff0b1",
-  cyan: "#47d6ff",
+  background: "#050a14",
+  panel: "#0a1628",
+  line: "rgba(46, 211, 255, 0.16)",
+  grid: "rgba(124, 255, 178, 0.08)",
+  text: "#e8f6ff",
+  muted: "#7f97a8",
+  safe: "#7cffb2",
+  cyan: "#2ed3ff",
   amber: "#ffbf5a",
   red: "#ff667d",
   blue: "#91a7ff",
@@ -311,13 +336,29 @@ function setPressed(buttons, activeValue, dataName) {
   });
 }
 
+function renderSignStatus() {
+  if (!els.signStatus) return;
+  els.signStatus.textContent = state.packetSigned ? "Packet signed" : "Unsigned packet";
+  els.signStatus.classList.toggle("is-signed", Boolean(state.packetSigned));
+}
+
 function renderMissionButtons() {
-  els.missionButtons.innerHTML = Object.entries(missions)
+  const query = state.missionQuery.trim().toLowerCase();
+  const rows = Object.entries(missions).filter(([, item]) => {
+    if (!query) return true;
+    const haystack = [item.label, item.sector, item.code, item.title, item.crownJewel].join(" ").toLowerCase();
+    return haystack.includes(query);
+  });
+  if (!rows.length) {
+    els.missionButtons.innerHTML = `<p class="muted-copy">No sectors match “${escapeHtml(state.missionQuery)}”.</p>`;
+    return;
+  }
+  els.missionButtons.innerHTML = rows
     .map(([key, item]) => {
       const active = key === state.mission ? " is-active" : "";
       const pressed = key === state.mission ? "true" : "false";
       return `
-        <button class="mission-button${active}" type="button" data-mission="${key}" aria-pressed="${pressed}">
+        <button class="mission-button sector-chip${active}" type="button" data-mission="${key}" aria-pressed="${pressed}">
           <span aria-hidden="true">${escapeHtml(item.code.split("-")[0])}</span>
           <strong>${escapeHtml(item.label)}</strong>
           <small>${escapeHtml(item.sector)}</small>
@@ -486,6 +527,12 @@ function renderDashboard() {
   els.decisionLoad.textContent = `${decisionLoad()} moves`;
   els.safeguardMetric.textContent = `${cover}%`;
   els.recoveryWindow.textContent = `${recoveryWindow()}m`;
+  if (els.resilienceMetric) {
+    els.resilienceMetric.textContent = String(scoreResilienceIndex(...scoreArgs()));
+  }
+  renderCsfPanel();
+  renderPlaybook();
+  renderSignStatus();
 
   renderTimeline();
   renderPolicy(score);
@@ -529,6 +576,68 @@ function drawGrid(ctx, width, height, spacing = 44) {
     ctx.stroke();
   }
   ctx.restore();
+}
+
+function drawRadarField(ctx, width, height, pulse) {
+  const cx = width * 0.5;
+  const cy = height * 0.52;
+  const maxR = Math.hypot(cx, cy) * 0.92;
+  ctx.save();
+  ctx.strokeStyle = "rgba(46, 211, 255, 0.12)";
+  ctx.lineWidth = 1;
+  for (let i = 1; i <= 5; i += 1) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, (maxR / 5) * i, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.moveTo(cx - maxR, cy);
+  ctx.lineTo(cx + maxR, cy);
+  ctx.moveTo(cx, cy - maxR);
+  ctx.lineTo(cx, cy + maxR);
+  ctx.stroke();
+
+  const angle = (pulse * 0.018) % (Math.PI * 2);
+  ctx.fillStyle = "rgba(46, 211, 255, 0.05)";
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.arc(cx, cy, maxR, angle - 0.32, angle);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(124, 255, 178, 0.28)";
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + Math.cos(angle) * maxR, cy + Math.sin(angle) * maxR);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawRecoveryLane(ctx, nodes, pulse) {
+  const crownNode = nodes.find((node) => node.type === "crown");
+  if (!crownNode) return;
+  nodes
+    .filter((node) => node.type === "recovery")
+    .forEach((rec, index) => {
+      const t = (pulse * 0.012 + index * 0.22) % 1;
+      ctx.save();
+      ctx.setLineDash([5, 9]);
+      ctx.strokeStyle = `rgba(124, 255, 178, ${0.22 + 0.18 * Math.sin(pulse * 0.04 + index)})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(rec.px, rec.py);
+      ctx.lineTo(crownNode.px, crownNode.py);
+      ctx.stroke();
+      const px = rec.px + (crownNode.px - rec.px) * t;
+      const py = rec.py + (crownNode.py - rec.py) * t;
+      ctx.setLineDash([]);
+      ctx.fillStyle = colors.safe;
+      ctx.shadowColor = colors.safe;
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.arc(px, py, 4.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
 }
 
 function nodeById(nodes, id) {
@@ -588,7 +697,8 @@ function drawTwin() {
   twinCtx.clearRect(0, 0, width, height);
   twinCtx.fillStyle = colors.background;
   twinCtx.fillRect(0, 0, width, height);
-  drawGrid(twinCtx, width, height);
+  drawGrid(twinCtx, width, height, 36);
+  drawRadarField(twinCtx, width, height, pulse);
 
   const sweepX = (pulse * 1.4) % Math.max(width, 1);
   twinCtx.save();
@@ -660,6 +770,8 @@ function drawTwin() {
     }
   });
   twinCtx.restore();
+
+  drawRecoveryLane(twinCtx, nodes, pulse);
 
   nodes.forEach((node, index) => {
     const nodeScore = clamp(node.weight * 100 + pressureScore() * 0.18 - coverage() * 0.08, 5, 98);
@@ -750,7 +862,7 @@ function drawContinuity() {
   const innerHeight = height - padding * 2;
 
   continuityCtx.clearRect(0, 0, width, height);
-  continuityCtx.fillStyle = "#111618";
+  continuityCtx.fillStyle = "#07101c";
   continuityCtx.fillRect(0, 0, width, height);
   drawGrid(continuityCtx, width, height, 38);
 
@@ -1487,6 +1599,9 @@ function buildPacketPayload() {
     techniqueCoverage: techniqueCoverage(rows).map((t) => t.label),
     futuresSignals: active.signals,
     evidence: active.evidence,
+    csf: csfFunctions(...scoreArgs()),
+    resilienceIndex: scoreResilienceIndex(...scoreArgs()),
+    playbook: playbookBeats(...scoreArgs()),
     profileName: state.activeProfileName,
     generatedAt: new Date().toISOString()
   };
@@ -1496,20 +1611,63 @@ function techniqueLabelsSafe(ids) {
   return ids.map((id) => techniqueCatalog[id]?.label ?? id);
 }
 
-async function exportPacket() {
-  const payload = buildPacketPayload();
-  const digest = await digestText(JSON.stringify(payload));
-  state.lastPacketDigest = digest;
-  const packet = { ...payload, integrityDigest: { algorithm: "SHA-256", digest } };
+function downloadPacketJson(packet, suffix = "packet") {
   const blob = new Blob([JSON.stringify(packet, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `aegis-horizon-${mission().code.toLowerCase()}-packet.json`;
+  link.download = `aegis-horizon-${mission().code.toLowerCase()}-${suffix}.json`;
   document.body.append(link);
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+async function exportPacket() {
+  const payload = buildPacketPayload();
+  const digest = await digestText(JSON.stringify(payload));
+  state.lastPacketDigest = digest;
+  downloadPacketJson({ ...payload, integrityDigest: { algorithm: "SHA-256", digest } });
+}
+
+async function signAndExportPacket() {
+  const payload = buildPacketPayload();
+  const digest = await digestText(JSON.stringify(payload));
+  state.lastPacketDigest = digest;
+  const packet = { ...payload, integrityDigest: { algorithm: "SHA-256", digest } };
+
+  if (!webCryptoAvailable()) {
+    markProfileState("Digest only");
+    downloadPacketJson(packet, "packet");
+    return;
+  }
+
+  try {
+    const keys = await ensureDeviceKeys();
+    if (!keys?.privateKey) {
+      markProfileState("Digest only");
+      downloadPacketJson(packet, "packet");
+      return;
+    }
+    const bytes = canonicalJsonBytes(payload);
+    const signature = await signPacket(bytes, keys.privateKey);
+    const publicKey = await exportPublicJwk(keys.publicKey);
+    state.packetSigned = true;
+    renderSignStatus();
+    markProfileState("Signed");
+    downloadPacketJson(
+      {
+        ...packet,
+        alg: PACKET_ALG,
+        publicKey,
+        signature
+      },
+      "signed"
+    );
+  } catch {
+    markProfileState("Digest only");
+    downloadPacketJson(packet, "packet");
+  }
 }
 
 async function preparePrintReport() {
@@ -1563,7 +1721,24 @@ async function preparePrintReport() {
     })
     .join("");
 
-  els.printGeneratedAt.textContent = `Generated ${new Date().toLocaleString()} · Aegis Horizon 1.3 · Local-first defensive twin`;
+  const csf = csfFunctions(...scoreArgs());
+  const index = scoreResilienceIndex(...scoreArgs());
+  const playbook = playbookBeats(...scoreArgs());
+  if (els.printCsfList) {
+    els.printCsfList.innerHTML = CSF_KEYS.map((key) => {
+      return `<li><strong>${escapeHtml(CSF_LABELS[key])}</strong> — ${num(csf[key])}</li>`;
+    }).join("");
+  }
+  if (els.printResilienceIndex) {
+    els.printResilienceIndex.textContent = `Resilience index: ${num(index)}`;
+  }
+  if (els.printPlaybookList) {
+    els.printPlaybookList.innerHTML = playbook
+      .map((beat) => `<li><strong>${escapeHtml(beat.stage)}</strong> — ${escapeHtml(beat.action)}</li>`)
+      .join("");
+  }
+
+  els.printGeneratedAt.textContent = `Generated ${new Date().toLocaleString()} · Aegis Horizon 2.0 · Local-first defensive twin`;
   els.printDigest.textContent =
     digest && digest !== "unavailable"
       ? `SHA-256 packet digest: ${digest}`
@@ -1637,6 +1812,78 @@ function overlayOpen(el) {
 function renderAdvice(score) {
   const items = postureAdvice(score, state);
   els.adviceList.innerHTML = items.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+}
+
+function csfRadarSvg(csf) {
+  const cx = 72;
+  const cy = 72;
+  const radius = 50;
+  const axis = (index, mag) => {
+    const angle = -Math.PI / 2 + (index * Math.PI * 2) / CSF_KEYS.length;
+    return [cx + Math.cos(angle) * mag, cy + Math.sin(angle) * mag];
+  };
+  const ring = (scale) => CSF_KEYS.map((_, index) => axis(index, radius * scale).map((n) => n.toFixed(1)).join(",")).join(" ");
+  const valuePts = CSF_KEYS.map((key, index) =>
+    axis(index, radius * (num(csf[key]) / 100)).map((n) => n.toFixed(1)).join(",")
+  ).join(" ");
+  const short = { govern: "GV", identify: "ID", protect: "PR", detect: "DE", respond: "RS", recover: "RC" };
+  const labels = CSF_KEYS.map((key, index) => {
+    const [x, y] = axis(index, radius + 14);
+    return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" dominant-baseline="middle">${escapeHtml(short[key])}</text>`;
+  }).join("");
+  return `
+    <svg class="csf-radar" viewBox="0 0 144 144" role="img" aria-hidden="true">
+      <polygon class="csf-ring" points="${ring(1)}"></polygon>
+      <polygon class="csf-ring" points="${ring(0.66)}"></polygon>
+      <polygon class="csf-ring" points="${ring(0.33)}"></polygon>
+      <polygon class="csf-value" points="${valuePts}"></polygon>
+      ${labels}
+    </svg>
+  `;
+}
+
+function renderCsfPanel() {
+  if (!els.csfPanel) return;
+  const csf = csfFunctions(...scoreArgs());
+  const index = scoreResilienceIndex(...scoreArgs());
+  const bars = CSF_KEYS.map((key) => {
+    const value = num(csf[key]);
+    return `
+      <div class="csf-bar">
+        <span>${escapeHtml(CSF_LABELS[key])}</span>
+        <div class="csf-track" aria-hidden="true"><i style="width:${value}%"></i></div>
+        <strong>${value}</strong>
+      </div>
+    `;
+  }).join("");
+  els.csfPanel.innerHTML = `
+    <div class="csf-head">
+      <span>NIST CSF 2.0</span>
+      <strong>Index ${num(index)}</strong>
+    </div>
+    <div class="csf-body">
+      ${csfRadarSvg(csf)}
+      <div class="csf-bars">${bars}</div>
+    </div>
+  `;
+}
+
+function renderPlaybook() {
+  if (!els.playbookList) return;
+  const beats = playbookBeats(...scoreArgs());
+  if (els.playbookState) {
+    els.playbookState.textContent = `${beats.length} beats`;
+  }
+  els.playbookList.innerHTML = beats
+    .map((beat, index) => {
+      return `
+        <li>
+          <span>${String(index + 1).padStart(2, "0")} ${escapeHtml(beat.stage)}</span>
+          <p>${escapeHtml(beat.action)}</p>
+        </li>
+      `;
+    })
+    .join("");
 }
 
 function renderHorizonStrip() {
@@ -1864,6 +2111,13 @@ function toggleHeat() {
 }
 
 function bindEvents() {
+  if (els.missionSearch) {
+    els.missionSearch.addEventListener("input", () => {
+      state.missionQuery = els.missionSearch.value;
+      renderMissionButtons();
+    });
+  }
+
   els.missionButtons.addEventListener("click", (event) => {
     const button = event.target.closest("[data-mission]");
     if (!button) return;
@@ -1916,6 +2170,7 @@ function bindEvents() {
   els.nextBeatButton.addEventListener("click", nextRehearsalBeat);
   els.resetRehearsalButton.addEventListener("click", resetRehearsal);
   els.exportButton.addEventListener("click", () => void exportPacket());
+  els.signPacketButton?.addEventListener("click", () => void signAndExportPacket());
   els.csvExportButton.addEventListener("click", exportPacketCsv);
   els.markdownExportButton.addEventListener("click", exportPacketMarkdown);
   els.printReportButton.addEventListener("click", () => void printReport());
@@ -2022,6 +2277,16 @@ function bindEvents() {
     if (event.key === "0") {
       event.preventDefault();
       resetRehearsal();
+      return;
+    }
+    if (event.key === "/") {
+      event.preventDefault();
+      els.missionSearch?.focus();
+      return;
+    }
+    if (event.key === "s" || event.key === "S") {
+      event.preventDefault();
+      void signAndExportPacket();
       return;
     }
     if (event.key === "]") {

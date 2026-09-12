@@ -522,6 +522,11 @@ export function packetMarkdown(score, state, mission, lens, horizon, controlWeig
   const policies = rows.map((row) => `- ${row.rule}`).join("\n");
   const timeline = mission.timeline.map(([time, action]) => `- ${time} ${action}`).join("\n");
   const evidence = mission.evidence.map((item) => `- ${item}`).join("\n");
+  const csf = csfFunctions(state, mission, lens, horizon, controlWeights);
+  const index = resilienceIndex(state, mission, lens, horizon, controlWeights);
+  const playbook = playbookBeats(state, mission, lens, horizon, controlWeights);
+  const csfLines = CSF_KEYS.map((key) => `- ${CSF_LABELS[key]}: ${csf[key]}`).join("\n");
+  const playbookLines = playbook.map((beat) => `- ${beat.stage}: ${beat.action}`).join("\n");
 
   return [
     `# ${mission.title}`,
@@ -530,6 +535,7 @@ export function packetMarkdown(score, state, mission, lens, horizon, controlWeig
     "",
     `Integrity: ${score}`,
     `Continuity: ${continuity}`,
+    `Resilience index: ${index}`,
     "",
     "## Policies",
     policies,
@@ -539,6 +545,139 @@ export function packetMarkdown(score, state, mission, lens, horizon, controlWeig
     "",
     "## Evidence",
     evidence,
+    "",
+    "## NIST CSF 2.0",
+    csfLines,
+    "",
+    "## Continuity playbook",
+    playbookLines,
     ""
   ].join("\n");
 }
+
+const CSF_KEYS = ["govern", "identify", "protect", "detect", "respond", "recover"];
+
+const CSF_LABELS = {
+  govern: "Govern",
+  identify: "Identify",
+  protect: "Protect",
+  detect: "Detect",
+  respond: "Respond",
+  recover: "Recover"
+};
+
+function boundedScore(value) {
+  return clamp(Math.round(Number.isFinite(value) ? value : 0), 0, 100);
+}
+
+/**
+ * NIST CSF 2.0 function scores derived from the live twin (pressure, safeguards,
+ * coverage, integrity, continuity, horizon). Deterministic, 0..100, DOM-free.
+ * @returns {{ govern: number, identify: number, protect: number, detect: number, respond: number, recover: number }}
+ */
+export function csfFunctions(state, mission, lens, horizon, controlWeights) {
+  const integ = integrityScore(state, mission, lens, horizon, controlWeights);
+  const cont = continuityScore(state, mission, lens, horizon, controlWeights);
+  const cover = coverage(state, mission, lens, horizon, controlWeights);
+  const pressure = pressureScore(state, mission, lens, horizon, controlWeights);
+  const load = decisionLoad(state, mission, lens, horizon, controlWeights);
+  const signal = signalScore(state, mission, lens, horizon, controlWeights);
+  const ready = evidenceReady(state, mission, lens, horizon, controlWeights);
+  const agent = Number(state?.pressure?.agent) || 0;
+  const supplier = Number(state?.pressure?.supplier) || 0;
+  const dataPressure = Number(state?.pressure?.data) || 0;
+  const drift = Number(horizon?.drift) || 0;
+  const controls = state?.controls ?? {};
+
+  return {
+    govern: boundedScore(
+      cover * 0.38 +
+        (controls.approvals ? 16 : 3) +
+        (controls.privacy ? 10 : 0) +
+        (controls.attestation ? 8 : 0) +
+        (Number(lens?.integrityShift) || 0) * 3 -
+        drift * 1.2
+    ),
+    identify: boundedScore(
+      signal * 0.32 + cover * 0.22 + (mission?.nodes?.length ?? 0) * 2.4 + ready * 4 - dataPressure * 0.16
+    ),
+    protect: boundedScore(
+      integ * 0.4 + cover * 0.26 + (controls.approvals ? 12 : -4) + (controls.privacy ? 6 : -3) - agent * 0.15
+    ),
+    detect: boundedScore(
+      signal * 0.36 +
+        cover * 0.18 +
+        (controls.attestation ? 18 : 3) +
+        (controls.approvals ? 6 : 0) -
+        supplier * 0.14 -
+        pressure * 0.05
+    ),
+    respond: boundedScore(
+      78 - load * 0.52 + (controls.approvals ? 12 : 0) + cover * 0.16 + (controls.recovery ? 6 : -4)
+    ),
+    recover: boundedScore(
+      cont * 0.52 + (controls.recovery ? 20 : -10) + cover * 0.14 + (controls.attestation ? 6 : 0) - drift
+    )
+  };
+}
+
+/**
+ * Weighted blend of CSF 2.0 functions. Protect and recover weigh slightly more
+ * for a continuity twin. Finite 0..100.
+ */
+export function resilienceIndex(state, mission, lens, horizon, controlWeights) {
+  const csf = csfFunctions(state, mission, lens, horizon, controlWeights);
+  return boundedScore(
+    csf.govern * 0.16 +
+      csf.identify * 0.12 +
+      csf.protect * 0.2 +
+      csf.detect * 0.14 +
+      csf.respond * 0.16 +
+      csf.recover * 0.22
+  );
+}
+
+/**
+ * Five-row defensive playbook from timeline beats and live safeguards.
+ * Stages are Detect → Contain → Recover → Attest → Brief. No attacker steps.
+ * @returns {Array<{ stage: string, action: string }>}
+ */
+export function playbookBeats(state, mission, _lens, _horizon, _controlWeights) {
+  const jewel = mission?.crownJewel || "the crown jewel";
+  const timeline = Array.isArray(mission?.timeline) ? mission.timeline : [];
+  const first = timeline[0]?.[1];
+  const second = timeline[1]?.[1];
+  const last = timeline.at(-1)?.[1];
+  const controls = state?.controls ?? {};
+
+  return [
+    {
+      stage: "Detect",
+      action: first || `Watch telemetry around ${jewel} and freeze high-impact automation`
+    },
+    {
+      stage: "Contain",
+      action: controls.approvals
+        ? `Hold changes to ${jewel} behind named-owner approval gates`
+        : `Restore named-owner approval before any change to ${jewel}`
+    },
+    {
+      stage: "Recover",
+      action: controls.recovery
+        ? second || `Activate the offline recovery lane for ${jewel}`
+        : `Stand up an offline recovery owner for ${jewel}`
+    },
+    {
+      stage: "Attest",
+      action: controls.attestation
+        ? `Attach signed evidence before restoring ${jewel}`
+        : `Require signed evidence on every write path to ${jewel}`
+    },
+    {
+      stage: "Brief",
+      action: last || `Brief owners on ${jewel} continuity and remaining uncertainty`
+    }
+  ];
+}
+
+export { CSF_KEYS, CSF_LABELS };

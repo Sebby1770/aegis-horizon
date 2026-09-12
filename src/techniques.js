@@ -53,6 +53,26 @@ export const techniqueCatalog = {
     id: "integrity-pause",
     label: "Integrity pause",
     blurb: "Halt new autonomy when integrity drops below a defensive threshold."
+  },
+  "network-isolation": {
+    id: "network-isolation",
+    label: "Network Isolation",
+    blurb: "Contain a stressed cell or zone so failure cannot cascade into crown jewels."
+  },
+  "backup-restoration": {
+    id: "backup-restoration",
+    label: "Backup Restoration",
+    blurb: "Restore attested backups and offline packets before resuming automation."
+  },
+  "sensor-diversity": {
+    id: "sensor-diversity",
+    label: "Sensor Diversity",
+    blurb: "Require agreeing independent sensors before a high-impact playbook step."
+  },
+  "out-of-band-command": {
+    id: "out-of-band-command",
+    label: "Out-of-band Command",
+    blurb: "Confirm high-impact changes on a second channel before actuation."
   }
 };
 
@@ -92,6 +112,26 @@ export const missionPolicyTechniques = {
     ["least-privilege", "human-in-the-loop", "zero-trust"],
     ["mfa-step-up", "provenance-attestation", "zero-trust"],
     ["segmented-recovery", "human-in-the-loop", "offline-continuity"]
+  ],
+  rail: [
+    ["human-in-the-loop", "out-of-band-command", "least-privilege"],
+    ["offline-continuity", "backup-restoration", "segmented-recovery"],
+    ["provenance-attestation", "zero-trust"]
+  ],
+  grid: [
+    ["human-in-the-loop", "least-privilege", "out-of-band-command"],
+    ["backup-restoration", "offline-continuity", "segmented-recovery"],
+    ["sensor-diversity", "provenance-attestation", "zero-trust"]
+  ],
+  aviation: [
+    ["human-in-the-loop", "least-privilege"],
+    ["offline-continuity", "backup-restoration", "segmented-recovery"],
+    ["provenance-attestation", "zero-trust"]
+  ],
+  factory: [
+    ["human-in-the-loop", "least-privilege", "integrity-pause"],
+    ["network-isolation", "segmented-recovery", "zero-trust"],
+    ["sensor-diversity", "provenance-attestation"]
   ]
 };
 
@@ -123,11 +163,23 @@ const dynamicPatterns = [
   },
   {
     test: /second-channel|out-of-band|fresh identity|consent proof|verification/i,
-    tags: ["mfa-step-up", "zero-trust"]
+    tags: ["mfa-step-up", "zero-trust", "out-of-band-command"]
   },
   {
     test: /supplier coupling|system-to-system trust|partner data|unknown fields/i,
     tags: ["zero-trust", "provenance-attestation"]
+  },
+  {
+    test: /network isolation|network-isolated|isolate the cell|contain the cell/i,
+    tags: ["network-isolation", "segmented-recovery"]
+  },
+  {
+    test: /backup restoration|restore from backup|crank-path|offline block|paper strips|paper-strip/i,
+    tags: ["backup-restoration", "offline-continuity"]
+  },
+  {
+    test: /sensor diversity|disagreeing sensors|dual telemetry/i,
+    tags: ["sensor-diversity"]
   }
 ];
 

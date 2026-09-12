@@ -6,6 +6,7 @@ import {
   bestFlip,
   boardBlurb,
   continuityDrop,
+  csfFunctions,
   dominantPressure,
   buildPacketCsv,
   buildPacketCsvRecords,
@@ -22,8 +23,10 @@ import {
   nodeDegrees,
   integrityScore,
   packetMarkdown,
+  playbookBeats,
   postureAdvice,
   pressureSweep,
+  resilienceIndex,
   serializeCsv,
   weakestNode,
   worstFlip
@@ -464,6 +467,76 @@ describe("isolatedNodes", () => {
       ["c"]
     );
     assert.deepEqual(isolatedNodes({ nodes: [] }), []);
+  });
+});
+
+describe("2.0 missions", () => {
+  for (const key of ["rail", "grid", "aviation", "factory"]) {
+    it(`${key} exists with 6+ nodes and rehearsal shape`, () => {
+      const mission = missions[key];
+      assert.ok(mission, `${key} mission must exist`);
+      assert.ok(mission.nodes.length >= 6, `${key} needs 6+ nodes`);
+      assert.equal(mission.timeline.length, 4);
+      assert.equal(mission.signals.length, 3);
+      assert.equal(mission.policies.length, 3);
+      assert.equal(mission.evidence.length, 4);
+      assert.equal(mission.future.length, 7);
+      assert.equal(typeof mission.crownJewel, "string");
+      assert.equal(typeof mission.promise, "string");
+      assert.equal(typeof mission.code, "string");
+      assert.equal(typeof mission.sector, "string");
+      assert.equal(typeof mission.brief, "string");
+      const ids = new Set(mission.nodes.map((node) => node.id));
+      assert.equal(ids.size, mission.nodes.length);
+      for (const [fromId, toId] of mission.links) {
+        assert.ok(ids.has(fromId), `${key} link from unknown ${fromId}`);
+        assert.ok(ids.has(toId), `${key} link to unknown ${toId}`);
+      }
+    });
+  }
+});
+
+describe("csfFunctions", () => {
+  it("returns six finite 0..100 scores", () => {
+    const csf = csfFunctions(...argsFor());
+    for (const key of ["govern", "identify", "protect", "detect", "respond", "recover"]) {
+      assert.equal(typeof csf[key], "number", key);
+      assert.equal(Number.isFinite(csf[key]), true, key);
+      assert.ok(csf[key] >= 0 && csf[key] <= 100, `${key}=${csf[key]}`);
+    }
+  });
+
+  it("stays in range on the new missions", () => {
+    for (const key of ["rail", "grid", "aviation", "factory"]) {
+      const csf = csfFunctions(...argsFor({ ...defaultState, mission: key }, key));
+      for (const score of Object.values(csf)) {
+        assert.equal(Number.isFinite(score), true);
+        assert.ok(score >= 0 && score <= 100);
+      }
+    }
+  });
+});
+
+describe("resilienceIndex", () => {
+  it("is finite 0..100", () => {
+    const index = resilienceIndex(...argsFor());
+    assert.equal(Number.isFinite(index), true);
+    assert.ok(index >= 0 && index <= 100, `got ${index}`);
+  });
+});
+
+describe("playbookBeats", () => {
+  it("returns five defensive stages", () => {
+    const beats = playbookBeats(...argsFor());
+    assert.equal(beats.length, 5);
+    assert.deepEqual(
+      beats.map((beat) => beat.stage),
+      ["Detect", "Contain", "Recover", "Attest", "Brief"]
+    );
+    for (const beat of beats) {
+      assert.equal(typeof beat.action, "string");
+      assert.ok(beat.action.length > 0);
+    }
   });
 });
 

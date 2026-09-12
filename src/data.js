@@ -334,6 +334,198 @@ export const missions = {
     ],
     evidence: ["Objective set", "Link-health proof", "Owner confirmation", "Command archive"],
     future: [60, 65, 69, 74, 78, 84, 90]
+  },
+  rail: {
+    code: "NR-22",
+    label: "Rail Net",
+    sector: "National Rail",
+    title: "National rail interlocking continuity twin",
+    brief:
+      "Rehearse national rail signalling, route interlocking, occupancy telemetry, and fallback block working so movement stays dispatcher-approved when automation confidence fades.",
+    crownJewel: "Route interlocking authority",
+    promise: "Interlocking stays attributable, dispatcher-approved, and recoverable when signalling trust degrades.",
+    baseIntegrity: 62,
+    signal: 81,
+    assets: 4100,
+    continuity: 69,
+    nodes: [
+      { id: "occupancy-feed", label: "Occupancy Feed", x: 0.18, y: 0.28, type: "data", weight: 0.63 },
+      { id: "route-agent", label: "Route Agent", x: 0.44, y: 0.2, type: "agent", weight: 0.79 },
+      { id: "signal-heads", label: "Signal Heads", x: 0.76, y: 0.32, type: "device", weight: 0.74 },
+      { id: "interlocking-core", label: "Interlock Core", x: 0.56, y: 0.57, type: "crown", weight: 0.9 },
+      { id: "fallback-block", label: "Fallback Block", x: 0.28, y: 0.76, type: "recovery", weight: 0.54 },
+      { id: "dispatcher-desk", label: "Dispatcher Desk", x: 0.79, y: 0.75, type: "policy", weight: 0.58 }
+    ],
+    links: [
+      ["occupancy-feed", "route-agent", "track"],
+      ["route-agent", "signal-heads", "aspect"],
+      ["signal-heads", "interlocking-core", "lock"],
+      ["interlocking-core", "fallback-block", "fallback"],
+      ["dispatcher-desk", "route-agent", "approval"],
+      ["interlocking-core", "dispatcher-desk", "alarm"]
+    ],
+    timeline: [
+      ["00m", "Freeze autonomous route setting and keep dispatcher-approved interlocking"],
+      ["08m", "Switch contested blocks to fallback block working"],
+      ["20m", "Reconcile occupancy telemetry against the interlocking ledger"],
+      ["36m", "Issue network continuity brief with dispatcher evidence"]
+    ],
+    signals: [
+      "Occupancy cadence drifted after a maintenance window",
+      "Route agent proposed a path without fresh dispatcher approval",
+      "Fallback block working is available but under-rehearsed this quarter"
+    ],
+    policies: [
+      "Route interlocking changes require named dispatcher approval before actuation",
+      "Signalling falls back to offline block working when occupancy confidence drops",
+      "Occupancy messages must carry provenance before interlocking authority consumes them"
+    ],
+    evidence: ["Dispatcher approval", "Occupancy attestation", "Fallback-block drill", "Route-impact owner"],
+    future: [53, 58, 64, 69, 74, 80, 85]
+  },
+  grid: {
+    code: "ET-33",
+    label: "Power Grid",
+    sector: "Electric Transmission",
+    title: "Transmission islanding and black-start recovery twin",
+    brief:
+      "Rehearse islanding authority, operator approval, dual telemetry, and black-start playbook continuity so restoration stays deliberate when OT confidence fades. This is an energy-resilience twin, not an engineering calculator.",
+    crownJewel: "Islanding & black-start playbook",
+    promise: "Islanding and black-start remain operator-approved, evidence-backed, and recoverable when SCADA trust degrades.",
+    baseIntegrity: 60,
+    signal: 80,
+    assets: 6400,
+    continuity: 73,
+    nodes: [
+      { id: "relay-fleet", label: "Relay Fleet", x: 0.19, y: 0.27, type: "device", weight: 0.71 },
+      { id: "island-agent", label: "Island Agent", x: 0.45, y: 0.2, type: "agent", weight: 0.8 },
+      { id: "scada-bus", label: "SCADA Bus", x: 0.77, y: 0.33, type: "data", weight: 0.66 },
+      { id: "blackstart-core", label: "Black-Start Core", x: 0.57, y: 0.57, type: "crown", weight: 0.91 },
+      { id: "crank-path", label: "Crank Path", x: 0.29, y: 0.76, type: "recovery", weight: 0.56 },
+      { id: "iso-desk", label: "ISO Desk", x: 0.8, y: 0.75, type: "policy", weight: 0.6 }
+    ],
+    links: [
+      ["relay-fleet", "island-agent", "status"],
+      ["island-agent", "scada-bus", "proposal"],
+      ["scada-bus", "blackstart-core", "picture"],
+      ["blackstart-core", "crank-path", "fallback"],
+      ["iso-desk", "island-agent", "approval"],
+      ["blackstart-core", "iso-desk", "alarm"]
+    ],
+    timeline: [
+      ["00m", "Freeze autonomous switching and hold the approved islanding picture"],
+      ["09m", "Activate the signed crank-path recovery lane"],
+      ["22m", "Reconcile relay and SCADA telemetry before the next playbook step"],
+      ["40m", "Brief grid owners on restoration confidence and remaining uncertainty"]
+    ],
+    signals: [
+      "Relay and SCADA pictures disagree after a maintenance window",
+      "Island agent proposed a playbook step without fresh operator approval",
+      "Crank-path packet is inside freshness but near review"
+    ],
+    policies: [
+      "Islanding and black-start steps require named operator approval before actuation",
+      "Restoration falls back to signed crank-path packets when SCADA confidence drops",
+      "Dual telemetry must agree, or sensor diversity rules block playbook progress"
+    ],
+    evidence: ["Operator approval", "Crank-path packet hash", "Dual-telemetry attestation", "Restoration-impact owner"],
+    future: [50, 56, 63, 68, 74, 79, 86]
+  },
+  aviation: {
+    code: "AV-19",
+    label: "Aviation",
+    sector: "Air Transport",
+    title: "Airport and ATM clearance resilience twin",
+    brief:
+      "Rehearse airport/ATM clearance, flight-strip integrity, radar confidence, and paper-strip fallback so airside operations stay explainable when automation trust fades.",
+    crownJewel: "Flight-strip / clearance authority",
+    promise: "Clearance authority stays controller-approved, strip-evident, and recoverable when radar or slot feeds degrade.",
+    baseIntegrity: 67,
+    signal: 86,
+    assets: 2180,
+    continuity: 70,
+    nodes: [
+      { id: "radar-feed", label: "Radar Feed", x: 0.18, y: 0.27, type: "device", weight: 0.73 },
+      { id: "strip-agent", label: "Strip Agent", x: 0.44, y: 0.2, type: "agent", weight: 0.81 },
+      { id: "slot-board", label: "Slot Board", x: 0.77, y: 0.33, type: "data", weight: 0.61 },
+      { id: "clearance-core", label: "Clearance Core", x: 0.56, y: 0.57, type: "crown", weight: 0.89 },
+      { id: "paper-strip", label: "Paper Strip", x: 0.28, y: 0.76, type: "recovery", weight: 0.52 },
+      { id: "tower-cab", label: "Tower Cab", x: 0.8, y: 0.75, type: "policy", weight: 0.59 }
+    ],
+    links: [
+      ["radar-feed", "strip-agent", "tracks"],
+      ["strip-agent", "slot-board", "demand"],
+      ["slot-board", "clearance-core", "release"],
+      ["clearance-core", "paper-strip", "fallback"],
+      ["tower-cab", "strip-agent", "approval"],
+      ["clearance-core", "tower-cab", "alarm"]
+    ],
+    timeline: [
+      ["00m", "Freeze automated strip updates and keep controller-approved clearances"],
+      ["07m", "Move contested positions onto the paper-strip recovery lane"],
+      ["18m", "Reconcile radar and slot evidence against the clearance ledger"],
+      ["34m", "Issue airside continuity brief with controller evidence"]
+    ],
+    signals: [
+      "Slot-board cadence shifted from the historical rhythm",
+      "Strip agent proposed a clearance without fresh controller approval",
+      "Paper-strip drills are current but owner confirmation is stale"
+    ],
+    policies: [
+      "Clearance changes require named controller approval before strip updates",
+      "Positions fall back to paper strips when radar confidence drops",
+      "Slot messages must carry provenance before clearance authority consumes them"
+    ],
+    evidence: ["Controller approval", "Strip attestation", "Paper-strip drill", "Airside-impact owner"],
+    future: [58, 63, 68, 72, 77, 83, 89]
+  },
+  factory: {
+    code: "FC-27",
+    label: "Factory",
+    sector: "Discrete Manufacturing",
+    title: "Discrete manufacturing OT cell continuity twin",
+    brief:
+      "Rehearse a discrete manufacturing OT cell, safety-rated stop authority, recipe attestation, and manual recovery so production pauses stay safe when cell automation confidence fades.",
+    crownJewel: "Safety-rated stop / change authority",
+    promise: "Safety-rated stop and change authority remain human-gated, attested, and recoverable when cell trust degrades.",
+    baseIntegrity: 65,
+    signal: 83,
+    assets: 1560,
+    continuity: 72,
+    nodes: [
+      { id: "robot-cell", label: "Robot Cell", x: 0.19, y: 0.28, type: "device", weight: 0.76 },
+      { id: "cell-agent", label: "Cell Agent", x: 0.45, y: 0.2, type: "agent", weight: 0.82 },
+      { id: "recipe-vault", label: "Recipe Vault", x: 0.76, y: 0.32, type: "data", weight: 0.68 },
+      { id: "stop-core", label: "Stop Core", x: 0.57, y: 0.57, type: "crown", weight: 0.92 },
+      { id: "manual-stop", label: "Manual Stop", x: 0.29, y: 0.76, type: "recovery", weight: 0.55 },
+      { id: "safety-plc", label: "Safety PLC", x: 0.8, y: 0.75, type: "policy", weight: 0.64 }
+    ],
+    links: [
+      ["robot-cell", "cell-agent", "telemetry"],
+      ["cell-agent", "recipe-vault", "request"],
+      ["recipe-vault", "stop-core", "permit"],
+      ["stop-core", "manual-stop", "fallback"],
+      ["safety-plc", "cell-agent", "interlock"],
+      ["stop-core", "safety-plc", "alarm"]
+    ],
+    timeline: [
+      ["00m", "Freeze cell-agent setpoints and hold the safety-rated stop picture"],
+      ["06m", "Isolate the cell and switch to the last attested recipe"],
+      ["16m", "Reconcile robot telemetry against the stop ledger"],
+      ["30m", "Brief operations on restart conditions and remaining uncertainty"]
+    ],
+    signals: [
+      "Robot-cell confidence drifted after a tooling change",
+      "Cell agent proposed a recipe change without fresh owner approval",
+      "Manual stop path is available but the last drill is aging"
+    ],
+    policies: [
+      "Safety-rated stop and recipe changes require named owner approval before actuation",
+      "The cell is network-isolated until change authority is restored",
+      "Disagreeing sensors keep the cell stopped until sensor diversity is reconciled"
+    ],
+    evidence: ["Owner approval", "Recipe attestation", "Isolation record", "Manual-stop drill"],
+    future: [55, 61, 66, 71, 76, 82, 88]
   }
 };
 

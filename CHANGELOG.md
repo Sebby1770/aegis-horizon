@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.1.0] — 2026-09-13
+
+### Added
+- Sector finder (`#missionSearch`, `/` key) filters the eleven missions by label, sector, code, or crown jewel.
+- Packet signature status pill in the top bar after a local ECDSA sign.
+
+## [2.0.0] — 2026-09-12
+
+### Added
+- **Command-center HUD.** Deep navy / phosphor mint / warning amber / trust cyan restyle, radar-grid background, glowing integrity ring, sector-chip missions, cinematic twin overlay. Honors `prefers-reduced-motion`.
+- **Four critical-infrastructure missions:** Rail Net (`rail`, route interlocking authority), Power Grid (`grid`, islanding & black-start playbook), Aviation (`aviation`, flight-strip / clearance authority), Factory (`factory`, safety-rated stop / change authority).
+- **NIST CSF 2.0 panel** (`csfFunctions`, `resilienceIndex`, `#csfPanel`) — six deterministic 0–100 function scores and a weighted resilience index.
+- **Continuity playbook** (`playbookBeats`, `#playbookList`) — Detect → Contain → Recover → Attest → Brief, derived from timeline + safeguards. Recovery lane pulses toward the crown jewel.
+- **WebCrypto packet signing** (`src/sign.js`) — local ECDSA P-256 device key, Sign button / `S` key, packet fields `signature`, `publicKey`, `alg: "ECDSA-P256-SHA256"`. Digest-only fallback when WebCrypto is missing. No network.
+- D3FEND-inspired defensive chips: Network Isolation, Backup Restoration, Sensor Diversity, Out-of-band Command.
+- Board markdown and print packets now include CSF scores and the playbook. CSV section order is unchanged (`policies`, `techniques`, `timeline`, `evidence`).
+
+### Changed
+- Package version `2.0.0`. Eleven scenarios. Integrity and continuity formulas are unchanged.
+
 ## [1.8.2] — 2026-09-09
 
 ### Fixed

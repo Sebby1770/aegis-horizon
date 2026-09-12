@@ -1,6 +1,6 @@
 # Aegis Horizon
 
-Aegis Horizon is a local-first cyber resilience twin studio for future defensive systems, tabletop rehearsals, and executive policy packets. Instead of acting like another SOC dashboard, it lets teams model a future system, tune autonomy and supplier pressure, watch trust paths move across a live canvas, and compile defensive rules with evidence.
+Aegis Horizon is a local-first **cyber resilience twin studio** — a NORAD-style command center for future defensive systems, tabletop rehearsals, NIST CSF 2.0 posture, and executive policy packets. Instead of acting like another SOC dashboard, it lets teams model a future system, tune autonomy and supplier pressure, watch trust paths move across a live canvas, and compile defensive rules with evidence.
 
 The project is intentionally defensive. It contains no exploit code, credential harvesting logic, malware samples, scanner modules, or instructions for unauthorized access.
 
@@ -8,16 +8,18 @@ The project is intentionally defensive. It contains no exploit code, credential 
 
 ## What it does
 
-- Models seven distinctive future systems: autonomous hospital care, autonomous ports, programmable treasury, frontier research, civic sensor grids, municipal water SCADA, and orbital logistics.
-- Draws an animated resilience twin with crown jewels, agents, recovery lanes, policy gates, trust paths, and moving evidence signals.
+- Models **eleven** distinctive future systems: autonomous hospital care, autonomous ports, programmable treasury, frontier research, civic sensor grids, municipal water SCADA, orbital logistics, national rail interlocking, electric transmission black-start, airport/ATM clearance, and discrete manufacturing OT cells.
+- Draws an animated resilience twin with crown jewels, agents, recovery lanes, policy gates, trust paths, and moving evidence signals on a radar-grid command canvas.
 - Tunes decision lens, 30/90/180-day horizon, agent authority, supplier coupling, data gravity, and four defensive safeguards.
-- Generates a tabletop timeline, policy forge rules with **defensive technique chips**, futures signals, and evidence ledger from the current local model.
-- Produces a local policy packet as **JSON** (SHA-256 digest when WebCrypto is available) or **CSV** (`section,item` for policies, techniques, timeline, and evidence).
+- Scores live **NIST CSF 2.0** functions (Govern, Identify, Protect, Detect, Respond, Recover) and a **resilience index**.
+- Derives a five-beat **defensive continuity playbook** (Detect → Contain → Recover → Attest → Brief).
+- Generates a tabletop timeline, policy forge rules with **defensive technique chips** (including D3FEND-inspired Network Isolation, Backup Restoration, Sensor Diversity, Out-of-band Command), futures signals, and evidence ledger from the current local model.
+- Produces a local policy packet as **JSON** (SHA-256 digest; optional **ECDSA P-256** device signature), **CSV** (`section,item` for policies, techniques, timeline, and evidence), or **markdown**.
 - Walks a **tabletop rehearsal stepper** through timeline beats (Rehearse / Next beat / Reset, `[` / `]`).
 - Supports **multiple named twin profiles** in local storage (Save / Save As / Load / Delete), with migration from the older single-profile key.
 - **Import / export** the full twin portfolio (profiles + current state + snapshots) as JSON — all offline, no network calls.
 - Captures **comparison snapshots** of scores and pressure settings, with a side-by-side delta view.
-- Opens a **printable board-level risk report** (mission, integrity/continuity, policies, techniques, timeline, evidence, SHA-256 digest).
+- Opens a **printable board-level risk report** (mission, integrity/continuity, CSF scores, playbook, policies, techniques, timeline, evidence, SHA-256 digest).
 - Ships as a static site suitable for GitHub Pages or any static host. Zero runtime npm dependencies.
 
 ## Run locally
@@ -33,6 +35,36 @@ http://127.0.0.1:4173
 ```
 
 No install step is required because the app has no runtime dependencies.
+
+## Local UX (v2.0)
+
+### Command center
+- Deep navy / phosphor mint / warning amber / trust cyan HUD. Radar-grid background, glowing integrity ring, sector-chip missions, cinematic twin overlay. Honors `prefers-reduced-motion` (static twin frame, no busy spin).
+
+### New sectors
+- **Rail Net** (`rail`) — national rail signalling / interlocking continuity. Crown: route interlocking authority.
+- **Power Grid** (`grid`) — electric transmission OT / black-start recovery (energy resilience, not an engineering calculator). Crown: islanding & black-start playbook.
+- **Aviation** (`aviation`) — airport/ATM ops resilience. Crown: flight-strip / clearance authority.
+- **Factory** (`factory`) — discrete manufacturing OT cell. Crown: safety-rated stop / change authority.
+
+### NIST CSF 2.0
+- Decision panel `csfPanel` renders a six-function radar + bars from `csfFunctions` (0–100, deterministic).
+- `resilienceIndex` is a weighted blend (protect and recover weigh slightly more).
+
+### Continuity playbook
+- `playbookBeats` derives Detect → Contain → Recover → Attest → Brief from the mission timeline and live safeguards.
+- Canvas pulses the recovery lane toward the crown jewel.
+
+### Packet signing
+- Toolbar **S** (and key `S`) signs the policy packet with a local ECDSA P-256 device key (`src/sign.js`).
+- Packet JSON includes `signature`, `publicKey`, and `alg: "ECDSA-P256-SHA256"`.
+- The JWK is a **device key, not a secret of the twin**. If WebCrypto is missing, export degrades to the existing SHA-256 digest path. No `fetch`.
+
+### Keyboard
+- `R` / `N` / `0` rehearsal (start / next / reset).
+- `[` / `]` previous / next beat.
+- `S` sign packet.
+- `?` help overlay. `Esc` closes overlays.
 
 ## Local UX (v1.7)
 
@@ -144,7 +176,7 @@ Policy Forge rules show blue-team technique chips such as Zero Trust, MFA / step
 npm test
 ```
 
-The validation script checks that static app files exist, the mission catalog (including Water Grid) is present, HTML references local assets only, scoring is extracted to `src/score.js`, rehearsal/CSV/sweep/gaps/compare/markdown/heatmap/help/horizon-strip/blurb/drop/hottest/best-flip/isolated/pressure/continuity/worst-flip controls exist, scenario links round-trip, snapshot sanitisation and dialog focus trapping are in place, and package version `1.8.2` is set. `node --test tools/score.test.mjs tools/share.test.mjs tools/sanitize.test.mjs tools/focus.test.mjs` covers snapshot boundary validation, dialog focus wrapping, scenario link encoding, decoding and rejection, plus integrity bounds, coverage monotonicity, Water Grid shape, CSV order, pressure sweeps, mission compare, packet markdown, finite control-flip deltas, weakest and hottest Water Grid nodes, recovery posture advice, 30/90/180 horizon strips, horizon and continuity drop, crown neighbors, board blurb, best/worst flip, isolated nodes, and dominant pressure. Live Pages URL: https://sebby1770.github.io/aegis-horizon/
+The validation script checks that static app files exist, the mission catalog (eleven scenarios including Water Grid plus rail / grid / aviation / factory) is present, HTML references local assets only, scoring is extracted to `src/score.js`, rehearsal/CSV/sweep/gaps/compare/markdown/heatmap/help/horizon-strip/blurb/drop/hottest/best-flip/isolated/pressure/continuity/worst-flip/CSF/playbook/sign controls exist, scenario links round-trip, snapshot sanitisation and dialog focus trapping are in place, and package version `2.1.0` is set. `node --test tools/score.test.mjs tools/share.test.mjs tools/sanitize.test.mjs tools/focus.test.mjs tools/sign.test.mjs` covers snapshot boundary validation, dialog focus wrapping, scenario link encoding, decoding and rejection, plus integrity bounds, coverage monotonicity, Water Grid shape, new mission shapes, CSV order, pressure sweeps, mission compare, packet markdown, finite control-flip deltas, weakest and hottest Water Grid nodes, recovery posture advice, 30/90/180 horizon strips, horizon and continuity drop, crown neighbors, board blurb, best/worst flip, isolated nodes, dominant pressure, CSF 2.0 scores, resilience index, five-beat playbooks, and canonical JSON / ECDSA packet signing. Live Pages URL: https://sebby1770.github.io/aegis-horizon/
 
 ## Publish on GitHub Pages
 
@@ -165,11 +197,13 @@ Live URL: [https://sebby1770.github.io/aegis-horizon/](https://sebby1770.github.
 │   ├── app.js
 │   ├── data.js
 │   ├── score.js
+│   ├── sign.js
 │   ├── techniques.js
 │   └── styles.css
 ├── tools/
 │   ├── validate.mjs
-│   └── score.test.mjs
+│   ├── score.test.mjs
+│   └── sign.test.mjs
 └── SECURITY.md
 ```
 
@@ -185,7 +219,8 @@ Live URL: [https://sebby1770.github.io/aegis-horizon/](https://sebby1770.github.
 - [x] Add pressure sweep, mission compare, packet markdown, heatmap, and keyboard help.
 - [x] Add control-gap deltas, weakest-node telemetry, and defensive posture advice.
 - [x] Add 30/90/180 horizon strip, crown-neighbor telemetry, and board blurb.
-- [ ] Add optional WebCrypto signing for exported policy packets (beyond SHA-256 digests).
+- [x] Add optional WebCrypto signing for exported policy packets (beyond SHA-256 digests).
+- [x] Add NIST CSF 2.0 scoring, continuity playbook, and four critical-infrastructure missions.
 
 ## Safety boundary
 

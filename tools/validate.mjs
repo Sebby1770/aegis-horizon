@@ -12,6 +12,7 @@ const requiredFiles = [
   "src/data.js",
   "src/score.js",
   "src/techniques.js",
+  "src/sign.js",
   "src/styles.css",
   "assets/aegis-mark.svg",
   "README.md",
@@ -140,6 +141,7 @@ async function main() {
   await assert(byPath["src/app.js"].includes('event.key === "r"'), "app.js must bind R for rehearsal");
   await assert(byPath["src/app.js"].includes('event.key === "n"'), "app.js must bind N for next beat");
   await assert(byPath["src/app.js"].includes('event.key === "0"'), "app.js must bind 0 for reset rehearsal");
+  await assert(byPath["src/app.js"].includes('event.key === "s"'), "app.js must bind S for sign");
 
   // Sweep / mission compare / markdown / heatmap / help
   await assert(byPath["index.html"].includes('id="sweepButton"'), "sweep button required");
@@ -180,6 +182,14 @@ async function main() {
   await assert(byPath["index.html"].includes('id="horizonDrop"'), "horizon drop required");
   await assert(byPath["index.html"].includes('id="continuityDrop"'), "continuity drop required");
   await assert(byPath["index.html"].includes('id="dominantPressure"'), "dominant pressure required");
+  await assert(byPath["index.html"].includes('id="csfPanel"'), "csfPanel required");
+  await assert(byPath["index.html"].includes('id="playbookList"'), "playbookList required");
+  await assert(byPath["index.html"].includes('id="signPacketButton"'), "sign button required");
+  await assert(byPath["src/app.js"].includes("csfFunctions"), "app.js must call csfFunctions");
+  await assert(byPath["src/app.js"].includes("resilienceIndex"), "app.js must call resilienceIndex");
+  await assert(byPath["src/app.js"].includes("playbookBeats"), "app.js must call playbookBeats");
+  await assert(byPath["src/app.js"].includes("signPacket"), "app.js must call signPacket");
+  await assert(byPath["src/app.js"].includes('from "./sign.js"'), "app.js must import sign module");
 
   // Scoring module
   await assert(byPath["src/app.js"].includes('from "./score.js"'), "app.js must import score module");
@@ -213,6 +223,9 @@ async function main() {
   await assert(byPath["src/score.js"].includes("export function dominantPressure"), "score.js must export dominantPressure");
   await assert(byPath["src/score.js"].includes("export function isolatedNodes"), "score.js must export isolatedNodes");
   await assert(byPath["src/score.js"].includes("export function nodeDegrees"), "score.js must export nodeDegrees");
+  await assert(byPath["src/score.js"].includes("export function csfFunctions"), "score.js must export csfFunctions");
+  await assert(byPath["src/score.js"].includes("export function resilienceIndex"), "score.js must export resilienceIndex");
+  await assert(byPath["src/score.js"].includes("export function playbookBeats"), "score.js must export playbookBeats");
   await assert(!/\bdocument\b/.test(byPath["src/score.js"]), "score.js must not use the DOM");
   await assert(!/\bwindow\b/.test(byPath["src/score.js"]), "score.js must not use window");
 
@@ -224,6 +237,13 @@ async function main() {
   await assert(byPath["src/app.js"].includes("from \"./techniques.js\""), "app.js must import techniques module");
   await assert(byPath["src/app.js"].includes("technique-chip"), "app.js must render technique chips");
   await assert(byPath["src/techniques.js"].includes("watergrid:"), "technique mapping must include watergrid");
+  await assert(byPath["src/techniques.js"].includes("rail:"), "technique mapping must include rail");
+  await assert(byPath["src/techniques.js"].includes("aviation:"), "technique mapping must include aviation");
+  await assert(byPath["src/techniques.js"].includes("factory:"), "technique mapping must include factory");
+  await assert(byPath["src/techniques.js"].includes("Network Isolation"), "technique catalog should include Network Isolation");
+  await assert(byPath["src/techniques.js"].includes("Backup Restoration"), "technique catalog should include Backup Restoration");
+  await assert(byPath["src/techniques.js"].includes("Sensor Diversity"), "technique catalog should include Sensor Diversity");
+  await assert(byPath["src/techniques.js"].includes("Out-of-band Command"), "technique catalog should include Out-of-band Command");
 
   // Multi-profile storage + migration
   await assert(byPath["src/app.js"].includes("aegis-horizon-portfolio-v1"), "portfolio storage key required");
@@ -250,21 +270,34 @@ async function main() {
 
   // Package version
   const pkg = JSON.parse(byPath["package.json"]);
-  await assert(pkg.version === "1.8.2", `package.json version should be 1.8.2 (got ${pkg.version})`);
+  await assert(pkg.version === "2.1.0", `package.json version should be 2.1.0 (got ${pkg.version})`);
   await assert(!pkg.dependencies || Object.keys(pkg.dependencies).length === 0, "no runtime npm dependencies allowed");
-  await assert(byPath["CHANGELOG.md"].includes("[1.8.2]"), "CHANGELOG must include 1.8.2");
+  await assert(byPath["CHANGELOG.md"].includes("[2.1.0]"), "CHANGELOG must include 2.1.0");
+  await assert(byPath["index.html"].includes('id="missionSearch"'), "mission search required");
+  await assert(byPath["index.html"].includes('id="signStatus"'), "sign status pill required");
+  await assert(byPath["src/app.js"].includes("missionQuery"), "app.js must filter missions");
   await assert(byPath["README.md"].includes("https://sebby1770.github.io/aegis-horizon/"), "README must document Pages URL");
 
   // No remote network calls in app modules (blob/data/local only)
-  const appSources = ["src/app.js", "src/data.js", "src/score.js", "src/techniques.js"].map((p) => byPath[p]).join("\n");
+  const appSources = ["src/app.js", "src/data.js", "src/score.js", "src/techniques.js", "src/sign.js"].map((p) => byPath[p]).join("\n");
   await assert(!/fetch\s*\(/.test(appSources), "app code must not use fetch");
   await assert(!/XMLHttpRequest/.test(appSources), "app code must not use XMLHttpRequest");
   await assert(!/WebSocket/.test(appSources), "app code must not use WebSocket");
 
   const scenarioMatches = byPath["src/data.js"].match(/code: "/g) ?? [];
-  await assert(scenarioMatches.length >= 7, "scenario catalog should include at least seven scenarios");
+  await assert(scenarioMatches.length >= 11, "scenario catalog should include at least eleven scenarios");
   await assert(byPath["src/data.js"].includes("watergrid:"), "data.js must include watergrid mission");
+  await assert(byPath["src/data.js"].includes("rail:"), "data.js must include rail mission");
+  await assert(byPath["src/data.js"].includes("\n  grid:"), "data.js must include grid mission");
+  await assert(byPath["src/data.js"].includes("aviation:"), "data.js must include aviation mission");
+  await assert(byPath["src/data.js"].includes("factory:"), "data.js must include factory mission");
   await assert((byPath["src/data.js"].match(/id: "source-intake"|id: "plant-agent"|id: "dose-skid"|id: "quality-core"|id: "offline-dose"|id: "ops-console"/g) ?? []).length >= 6, "watergrid should define six nodes");
+
+  await assert(byPath["src/sign.js"].includes("export async function signPacket"), "sign.js must export signPacket");
+  await assert(byPath["src/sign.js"].includes("export async function verifyPacket"), "sign.js must export verifyPacket");
+  await assert(byPath["src/sign.js"].includes("export function canonicalJsonBytes"), "sign.js must export canonicalJsonBytes");
+  await assert(byPath["src/sign.js"].includes("ECDSA-P256-SHA256"), "sign.js must name ECDSA-P256-SHA256");
+  await assert(byPath["src/styles.css"].includes("prefers-reduced-motion"), "styles must respect reduced motion");
 
   const unsafeTerms = ["reverse shell", "credential harvester", "exploit payload"];
   const scannedPaths = requiredFiles.filter((path) => path !== "tools/validate.mjs");
@@ -304,7 +337,7 @@ async function main() {
 
 
   console.log(
-    `Validated ${requiredFiles.length} files, ${scenarioMatches.length} scenarios, score/rehearsal/csv/sweep/gaps/compare/markdown/heat/help/horizon/blurb features, v${pkg.version}.`
+    `Validated ${requiredFiles.length} files, ${scenarioMatches.length} scenarios, score/rehearsal/csv/sweep/gaps/compare/markdown/heat/help/horizon/blurb/csf/playbook/sign features, v${pkg.version}.`
   );
 }
 
